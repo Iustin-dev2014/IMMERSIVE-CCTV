@@ -1,0 +1,1345 @@
+name: Build Immersive CCTV Mod
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ "**" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install and Configure Gradle 8.5 (Bypass Gradle 9)
+        run: |
+          wget -q https://services.gradle.org/distributions/gradle-8.5-bin.zip
+          sudo unzip -q gradle-8.5-bin.zip -d /opt
+          echo "/opt/gradle-8.5/bin" >> $GITHUB_PATH
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install Python Imaging (Pillow)
+        run: pip install pillow
+
+      - name: Generate Project Structure & Source Code
+        run: |
+          mkdir -p src/main/java/com/immersivecctv/block
+          mkdir -p src/main/java/com/immersivecctv/blockentity
+          mkdir -p src/main/java/com/immersivecctv/client
+          mkdir -p src/main/java/com/immersivecctv/item
+          mkdir -p src/main/resources/META-INF
+          mkdir -p src/main/resources/assets/immersivecctv/lang
+          mkdir -p src/main/resources/assets/immersivecctv/blockstates
+          mkdir -p src/main/resources/assets/immersivecctv/models/block
+          mkdir -p src/main/resources/assets/immersivecctv/models/item
+          mkdir -p src/main/resources/assets/immersivecctv/textures/block
+          mkdir -p src/main/resources/assets/immersivecctv/textures/item
+
+          # ==========================================
+          # 1. GRADLE CONFIGURATION
+          # ==========================================
+          cat << 'EOF' > settings.gradle
+          pluginManagement {
+              repositories {
+                  gradlePluginPortal()
+                  maven {
+                      name = 'MinecraftForge'
+                      url = 'https://maven.minecraftforge.net/'
+                  }
+                  mavenCentral()
+              }
+          }
+          rootProject.name = 'immersivecctv'
+          EOF
+
+          cat << 'EOF' > build.gradle
+          plugins {
+              id 'eclipse'
+              id 'maven-publish'
+              id 'net.minecraftforge.gradle' version '[6.0,6.2)'
+          }
+
+          version = '1.0.0'
+          group = 'com.immersivecctv'
+          archivesBaseName = 'immersivecctv-1.20.1'
+
+          java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+          minecraft {
+              mappings channel: 'official', version: '1.20.1'
+              copyIdeResources = true
+              runs {
+                  client {
+                      workingDirectory project.file('run')
+                      property 'forge.logging.markers', 'REGISTRIES'
+                      property 'forge.logging.console.level', 'debug'
+                      mods {
+                          immersivecctv {
+                              source sourceSets.main
+                          }
+                      }
+                  }
+              }
+          }
+
+          repositories {
+              mavenCentral()
+              maven {
+                  name = 'MinecraftForge'
+                  url = 'https://maven.minecraftforge.net/'
+              }
+          }
+
+          dependencies {
+              minecraft 'net.minecraftforge:forge:1.20.1-47.2.0'
+          }
+
+          tasks.withType(JavaCompile).configureEach {
+              options.encoding = 'UTF-8'
+          }
+
+          jar {
+              manifest {
+                  attributes([
+                      "Specification-Title"     : "immersivecctv",
+                      "Specification-Vendor"    : "ImmersiveCCTV",
+                      "Specification-Version"   : "1",
+                      "Implementation-Title"    : project.name,
+                      "Implementation-Version"  : project.jar.archiveVersion,
+                      "Implementation-Vendor"   : "ImmersiveCCTV",
+                      "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
+                  ])
+              }
+          }
+          EOF
+
+          cat << 'EOF' > gradle.properties
+          org.gradle.jvmargs=-Xmx3G
+          org.gradle.daemon=false
+          EOF
+
+          # ==========================================
+          # 2. METADATA & LANGUAGE
+          # ==========================================
+          cat << 'EOF' > src/main/resources/META-INF/mods.toml
+          modLoader="javafml"
+          loaderVersion="[47,)"
+          license="MIT"
+          [[mods]]
+          modId="immersivecctv"
+          version="1.0.0"
+          displayName="Immersive CCTV"
+          description='''Sistem profesional de supraveghere CCTV: XVR, Camere IR Bullet, Monitoare si cabluri fizice Cat6/HDMI.'''
+          authors="ImmersiveCCTV Dev"
+
+          [[dependencies.immersivecctv]]
+              modId="forge"
+              mandatory=true
+              versionRange="[47,)"
+              ordering="NONE"
+              side="BOTH"
+
+          [[dependencies.immersivecctv]]
+              modId="minecraft"
+              mandatory=true
+              versionRange="[1.20.1,1.21)"
+              ordering="NONE"
+              side="BOTH"
+          EOF
+
+          cat << 'EOF' > src/main/resources/assets/immersivecctv/lang/en_us.json
+          {
+            "block.immersivecctv.xvr_unit": "Unitate Centrală XVR",
+            "block.immersivecctv.cctv_monitor": "Monitor CCTV Wide Screen",
+            "block.immersivecctv.bullet_camera": "Cameră Video XVR Bullet HD",
+            "item.immersivecctv.hdmi_cable": "Cablu HDMI Heavy-Duty",
+            "item.immersivecctv.poe_cable": "Cablu Ethernet PoE Cat6",
+            "itemGroup.immersivecctv_tab": "Immersive CCTV"
+          }
+          EOF
+
+      - name: Generate 64x64 HD Textures (Python PIL)
+        run: |
+          python3 - << 'EOF'
+          from PIL import Image, ImageDraw
+          import random
+
+          def make_brushed_metal(w=64, h=64, base=(40, 42, 45)):
+              img = Image.new('RGB', (w, h), base)
+              draw = ImageDraw.Draw(img)
+              random.seed(42)
+              for y in range(h):
+                  for x in range(w):
+                      noise = random.randint(-8, 8)
+                      r = max(0, min(255, base[0] + noise))
+                      g = max(0, min(255, base[1] + noise))
+                      b = max(0, min(255, base[2] + noise))
+                      draw.point((x, y), fill=(r, g, b))
+              return img
+
+          # XVR Textures
+          xvr_top = make_brushed_metal(64, 64, (32, 34, 38))
+          d = ImageDraw.Draw(xvr_top)
+          d.rectangle([4, 4, 60, 60], outline=(55, 58, 65), width=2)
+          for y in range(16, 48, 4):
+              d.line([(8, y), (24, y)], fill=(15, 15, 18), width=2)
+              d.line([(40, y), (56, y)], fill=(15, 15, 18), width=2)
+          xvr_top.save("src/main/resources/assets/immersivecctv/textures/block/xvr_top.png")
+
+          xvr_side = make_brushed_metal(64, 64, (28, 30, 33))
+          d = ImageDraw.Draw(xvr_side)
+          for x in range(10, 54, 4):
+              d.line([(x, 15), (x, 49)], fill=(12, 12, 15), width=2)
+          xvr_side.save("src/main/resources/assets/immersivecctv/textures/block/xvr_side.png")
+
+          xvr_front = make_brushed_metal(64, 64, (20, 22, 25))
+          d = ImageDraw.Draw(xvr_front)
+          for i in range(8):
+              px = 6 + (i % 4) * 14
+              py = 18 if i < 4 else 36
+              d.rectangle([px, py, px + 10, py + 12], fill=(10, 10, 12), outline=(100, 105, 115))
+              d.rectangle([px + 2, py + 3, px + 8, py + 6], fill=(218, 165, 32)) # Gold pins
+          d.ellipse([50, 48, 58, 56], fill=(70, 75, 85), outline=(140, 145, 155)) # Power button
+          d.ellipse([46, 18, 49, 21], fill=(0, 255, 60)) # Green PWR LED
+          d.ellipse([54, 18, 57, 21], fill=(255, 140, 0)) # Orange LAN LED
+          xvr_front.save("src/main/resources/assets/immersivecctv/textures/block/xvr_front.png")
+
+          # Monitor Textures
+          mon_screen = Image.new('RGB', (64, 64), (10, 14, 20))
+          d = ImageDraw.Draw(mon_screen)
+          d.rectangle([2, 2, 61, 61], outline=(30, 35, 45), width=2)
+          mon_screen.save("src/main/resources/assets/immersivecctv/textures/block/monitor_screen.png")
+
+          mon_back = make_brushed_metal(64, 64, (35, 38, 42))
+          d = ImageDraw.Draw(mon_back)
+          d.rectangle([24, 24, 40, 40], fill=(20, 22, 25), outline=(60, 65, 75))
+          mon_back.save("src/main/resources/assets/immersivecctv/textures/block/monitor_back.png")
+
+          # Camera Textures
+          cam_body = make_brushed_metal(64, 64, (210, 215, 220))
+          cam_body.save("src/main/resources/assets/immersivecctv/textures/block/camera_body.png")
+
+          cam_lens = Image.new('RGB', (64, 64), (15, 16, 20))
+          d = ImageDraw.Draw(cam_lens)
+          d.ellipse([14, 14, 50, 50], fill=(10, 25, 45), outline=(80, 85, 95), width=2)
+          d.ellipse([24, 24, 40, 40], fill=(5, 5, 15), outline=(30, 90, 180), width=2)
+          import math
+          for angle in range(0, 360, 30):
+              rad = math.radians(angle)
+              cx = int(32 + 20 * math.cos(rad))
+              cy = int(32 + 20 * math.sin(rad))
+              d.ellipse([cx-2, cy-2, cx+2, cy+2], fill=(139, 0, 0))
+          cam_lens.save("src/main/resources/assets/immersivecctv/textures/block/camera_lens.png")
+
+          # Cable Items
+          hdmi = Image.new('RGBA', (64, 64), (0, 0, 0, 0))
+          d = ImageDraw.Draw(hdmi)
+          d.arc([8, 8, 56, 56], start=45, end=270, fill=(30, 30, 35, 255), width=6)
+          d.rectangle([34, 10, 52, 22], fill=(218, 165, 32, 255), outline=(50, 50, 50, 255))
+          hdmi.save("src/main/resources/assets/immersivecctv/textures/item/hdmi_cable.png")
+
+          poe = Image.new('RGBA', (64, 64), (0, 0, 0, 0))
+          d = ImageDraw.Draw(poe)
+          d.arc([8, 8, 56, 56], start=30, end=250, fill=(0, 90, 200, 255), width=6)
+          d.rectangle([34, 8, 50, 24], fill=(180, 220, 255, 200), outline=(0, 60, 150, 255))
+          poe.save("src/main/resources/assets/immersivecctv/textures/item/poe_cable.png")
+          print("Texturi generate cu succes!")
+          EOF
+
+      - name: Generate Blockstates & Models JSON
+        run: |
+          cat << 'EOF' > src/main/resources/assets/immersivecctv/blockstates/xvr_unit.json
+          { "variants": { "": { "model": "immersivecctv:block/xvr_unit" } } }
+          EOF
+
+          cat << 'EOF' > src/main/resources/assets/immersivecctv/blockstates/cctv_monitor.json
+          { "variants": { "": { "model": "immersivecctv:block/cctv_monitor" } } }
+          EOF
+
+          cat << 'EOF' > src/main/resources/assets/immersivecctv/blockstates/bullet_camera.json
+          { "variants": { "": { "model": "immersivecctv:block/bullet_camera" } } }
+          EOF
+
+          cat << 'EOF' > src/main/resources/assets/immersivecctv/models/block/xvr_unit.json
+          {
+            "parent": "block/block",
+            "textures": {
+              "particle": "immersivecctv:block/xvr_front",
+              "top": "immersivecctv:block/xvr_top",
+              "bottom": "immersivecctv:block/xvr_top",
+              "side": "immersivecctv:block/xvr_side",
+              "front": "immersivecctv:block/xvr_front"
+            },
+            "elements": [
+              {
+                "from": [1, 0, 1],
+                "to": [15, 5, 15],
+                "faces": {
+                  "north": { "texture": "#front", "cullface": "north" },
+                  "south": { "texture": "#side", "cullface": "south" },
+                  "west": { "texture": "#side", "cullface": "west" },
+                  "east": { "texture": "#side", "cullface": "east" },
+                  "up": { "texture": "#top" },
+                  "down": { "texture": "#bottom", "cullface": "down" }
+                }
+              }
+            ]
+          }
+          EOF
+
+          cat << 'EOF' > src/main/resources/assets/immersivecctv/models/block/cctv_monitor.json
+          {
+            "parent": "block/block",
+            "textures": {
+              "particle": "immersivecctv:block/monitor_screen",
+              "screen": "immersivecctv:block/monitor_screen",
+              "back": "immersivecctv:block/monitor_back",
+              "stand": "immersivecctv:block/xvr_side"
+            },
+            "elements": [
+              {
+                "from": [4, 0, 4],
+                "to": [12, 1, 12],
+                "faces": {
+                  "up": { "texture": "#stand" },
+                  "down": { "texture": "#stand", "cullface": "down" },
+                  "north": { "texture": "#stand" },
+                  "south": { "texture": "#stand" },
+                  "west": { "texture": "#stand" },
+                  "east": { "texture": "#stand" }
+                }
+              },
+              {
+                "from": [7, 1, 7],
+                "to": [9, 6, 9],
+                "faces": {
+                  "north": { "texture": "#stand" },
+                  "south": { "texture": "#stand" },
+                  "west": { "texture": "#stand" },
+                  "east": { "texture": "#stand" }
+                }
+              },
+              {
+                "from": [0, 4, 6],
+                "to": [16, 16, 8],
+                "faces": {
+                  "north": { "texture": "#screen" },
+                  "south": { "texture": "#back" },
+                  "west": { "texture": "#back" },
+                  "east": { "texture": "#back" },
+                  "up": { "texture": "#back" },
+                  "down": { "texture": "#back" }
+                }
+              }
+            ]
+          }
+          EOF
+
+          cat << 'EOF' > src/main/resources/assets/immersivecctv/models/block/bullet_camera.json
+          {
+            "parent": "block/block",
+            "textures": {
+              "particle": "immersivecctv:block/camera_lens",
+              "body": "immersivecctv:block/camera_body",
+              "lens": "immersivecctv:block/camera_lens"
+            },
+            "elements": [
+              {
+                "from": [5, 4, 3],
+                "to": [11, 10, 13],
+                "faces": {
+                  "north": { "texture": "#lens" },
+                  "south": { "texture": "#body" },
+                  "west": { "texture": "#body" },
+                  "east": { "texture": "#body" },
+                  "up": { "texture": "#body" },
+                  "down": { "texture": "#body" }
+                }
+              },
+              {
+                "from": [7, 10, 7],
+                "to": [9, 16, 9],
+                "faces": {
+                  "north": { "texture": "#body" },
+                  "south": { "texture": "#body" },
+                  "west": { "texture": "#body" },
+                  "east": { "texture": "#body" },
+                  "up": { "texture": "#body", "cullface": "up" }
+                }
+              }
+            ]
+          }
+          EOF
+
+          cat << 'EOF' > src/main/resources/assets/immersivecctv/models/item/xvr_unit.json
+          { "parent": "immersivecctv:block/xvr_unit" }
+          EOF
+
+          cat << 'EOF' > src/main/resources/assets/immersivecctv/models/item/cctv_monitor.json
+          { "parent": "immersivecctv:block/cctv_monitor" }
+          EOF
+
+          cat << 'EOF' > src/main/resources/assets/immersivecctv/models/item/bullet_camera.json
+          { "parent": "immersivecctv:block/bullet_camera" }
+          EOF
+
+          cat << 'EOF' > src/main/resources/assets/immersivecctv/models/item/hdmi_cable.json
+          {
+            "parent": "item/generated",
+            "textures": { "layer0": "immersivecctv:item/hdmi_cable" }
+          }
+          EOF
+
+          cat << 'EOF' > src/main/resources/assets/immersivecctv/models/item/poe_cable.json
+          {
+            "parent": "item/generated",
+            "textures": { "layer0": "immersivecctv:item/poe_cable" }
+          }
+          EOF
+
+      - name: Generate Java Mod Code
+        run: |
+          # 1. Main Mod Entry
+          cat << 'EOF' > src/main/java/com/immersivecctv/ImmersiveCCTV.java
+          package com.immersivecctv;
+
+          import com.immersivecctv.block.*;
+          import com.immersivecctv.blockentity.*;
+          import com.immersivecctv.item.*;
+          import net.minecraft.core.registries.Registries;
+          import net.minecraft.network.chat.Component;
+          import net.minecraft.world.item.*;
+          import net.minecraft.world.level.block.Block;
+          import net.minecraft.world.level.block.entity.BlockEntityType;
+          import net.minecraft.world.level.block.state.BlockBehaviour;
+          import net.minecraft.world.level.material.MapColor;
+          import net.minecraftforge.common.MinecraftForge;
+          import net.minecraftforge.eventbus.api.IEventBus;
+          import net.minecraftforge.fml.common.Mod;
+          import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+          import net.minecraftforge.registries.DeferredRegister;
+          import net.minecraftforge.registries.ForgeRegistries;
+          import net.minecraftforge.registries.RegistryObject;
+
+          @Mod(ImmersiveCCTV.MODID)
+          public class ImmersiveCCTV {
+              public static final String MODID = "immersivecctv";
+
+              public static final DeferredRegister<Block> BLOCKS = DeferredRegister.create(ForgeRegistries.BLOCKS, MODID);
+              public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, MODID);
+              public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITIES = DeferredRegister.create(ForgeRegistries.BLOCK_ENTITY_TYPES, MODID);
+              public static final DeferredRegister<CreativeModeTab> CREATIVE_TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);
+
+              public static final RegistryObject<Block> XVR_BLOCK = BLOCKS.register("xvr_unit", 
+                  () -> new XvrBlock(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK).strength(2.0f).noOcclusion()));
+              public static final RegistryObject<Block> MONITOR_BLOCK = BLOCKS.register("cctv_monitor", 
+                  () -> new MonitorBlock(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK).strength(1.5f).noOcclusion()));
+              public static final RegistryObject<Block> CAMERA_BLOCK = BLOCKS.register("bullet_camera", 
+                  () -> new CameraBlock(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(1.5f).noOcclusion()));
+
+              public static final RegistryObject<Item> XVR_ITEM = ITEMS.register("xvr_unit", 
+                  () -> new BlockItem(XVR_BLOCK.get(), new Item.Properties()));
+              public static final RegistryObject<Item> MONITOR_ITEM = ITEMS.register("cctv_monitor", 
+                  () -> new BlockItem(MONITOR_BLOCK.get(), new Item.Properties()));
+              public static final RegistryObject<Item> CAMERA_ITEM = ITEMS.register("bullet_camera", 
+                  () -> new BlockItem(CAMERA_BLOCK.get(), new Item.Properties()));
+              public static final RegistryObject<Item> HDMI_CABLE = ITEMS.register("hdmi_cable", 
+                  () -> new HdmiCableItem(new Item.Properties().stacksTo(1)));
+              public static final RegistryObject<Item> POE_CABLE = ITEMS.register("poe_cable", 
+                  () -> new PoeCableItem(new Item.Properties().stacksTo(1)));
+
+              public static final RegistryObject<BlockEntityType<XvrBlockEntity>> XVR_BE = BLOCK_ENTITIES.register("xvr_unit",
+                  () -> BlockEntityType.Builder.of(XvrBlockEntity::new, XVR_BLOCK.get()).build(null));
+              public static final RegistryObject<BlockEntityType<MonitorBlockEntity>> MONITOR_BE = BLOCK_ENTITIES.register("cctv_monitor",
+                  () -> BlockEntityType.Builder.of(MonitorBlockEntity::new, MONITOR_BLOCK.get()).build(null));
+              public static final RegistryObject<BlockEntityType<CameraBlockEntity>> CAMERA_BE = BLOCK_ENTITIES.register("bullet_camera",
+                  () -> BlockEntityType.Builder.of(CameraBlockEntity::new, CAMERA_BLOCK.get()).build(null));
+
+              public static final RegistryObject<CreativeModeTab> TAB = CREATIVE_TABS.register("immersivecctv_tab",
+                  () -> CreativeModeTab.builder()
+                      .title(Component.translatable("itemGroup.immersivecctv_tab"))
+                      .icon(() -> new ItemStack(XVR_ITEM.get()))
+                      .displayItems((params, output) -> {
+                          output.accept(XVR_ITEM.get());
+                          output.accept(MONITOR_ITEM.get());
+                          output.accept(CAMERA_ITEM.get());
+                          output.accept(HDMI_CABLE.get());
+                          output.accept(POE_CABLE.get());
+                      })
+                      .build());
+
+              public ImmersiveCCTV() {
+                  IEventBus bus = FMLJavaModLoadingContext.get().getModEventBus();
+                  BLOCKS.register(bus);
+                  ITEMS.register(bus);
+                  BLOCK_ENTITIES.register(bus);
+                  CREATIVE_TABS.register(bus);
+              }
+          }
+          EOF
+
+          # 2. Block Classes
+          cat << 'EOF' > src/main/java/com/immersivecctv/block/XvrBlock.java
+          package com.immersivecctv.block;
+
+          import com.immersivecctv.blockentity.XvrBlockEntity;
+          import net.minecraft.core.BlockPos;
+          import net.minecraft.sounds.SoundEvents;
+          import net.minecraft.sounds.SoundSource;
+          import net.minecraft.world.InteractionHand;
+          import net.minecraft.world.InteractionResult;
+          import net.minecraft.world.entity.player.Player;
+          import net.minecraft.world.level.Level;
+          import net.minecraft.world.level.block.BaseEntityBlock;
+          import net.minecraft.world.level.block.RenderShape;
+          import net.minecraft.world.level.block.entity.BlockEntity;
+          import net.minecraft.world.level.block.entity.BlockEntityTicker;
+          import net.minecraft.world.level.block.entity.BlockEntityType;
+          import net.minecraft.world.level.block.state.BlockState;
+          import net.minecraft.world.phys.BlockHitResult;
+          import org.jetbrains.annotations.Nullable;
+
+          public class XvrBlock extends BaseEntityBlock {
+              public XvrBlock(Properties prop) { super(prop); }
+
+              @Override
+              public RenderShape getRenderShape(BlockState state) { return RenderShape.MODEL; }
+
+              @Nullable
+              @Override
+              public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
+                  return new XvrBlockEntity(pos, state);
+              }
+
+              @Override
+              public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hit) {
+                  if (player.getItemInHand(hand).isEmpty()) {
+                      if (!level.isClientSide()) {
+                          BlockEntity be = level.getBlockEntity(pos);
+                          if (be instanceof XvrBlockEntity xvr) {
+                              xvr.togglePower();
+                              level.playSound(null, pos, SoundEvents.UI_BUTTON_CLICK.get(), SoundSource.BLOCKS, 1.0f, xvr.isPowered() ? 1.2f : 0.8f);
+                          }
+                      }
+                      return InteractionResult.sidedSuccess(level.isClientSide());
+                  }
+                  return InteractionResult.PASS;
+              }
+
+              @Nullable
+              @Override
+              public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
+                  return (lvl, p, st, be) -> {
+                      if (be instanceof XvrBlockEntity xvr) xvr.tick(lvl, p, st);
+                  };
+              }
+          }
+          EOF
+
+          cat << 'EOF' > src/main/java/com/immersivecctv/block/MonitorBlock.java
+          package com.immersivecctv.block;
+
+          import com.immersivecctv.blockentity.MonitorBlockEntity;
+          import com.immersivecctv.client.ClientGuiOpener;
+          import net.minecraft.core.BlockPos;
+          import net.minecraft.world.InteractionHand;
+          import net.minecraft.world.InteractionResult;
+          import net.minecraft.world.entity.player.Player;
+          import net.minecraft.world.level.Level;
+          import net.minecraft.world.level.block.BaseEntityBlock;
+          import net.minecraft.world.level.block.RenderShape;
+          import net.minecraft.world.level.block.entity.BlockEntity;
+          import net.minecraft.world.level.block.state.BlockState;
+          import net.minecraft.world.phys.BlockHitResult;
+          import net.minecraftforge.api.distmarker.Dist;
+          import net.minecraftforge.fml.DistExecutor;
+          import org.jetbrains.annotations.Nullable;
+
+          public class MonitorBlock extends BaseEntityBlock {
+              public MonitorBlock(Properties prop) { super(prop); }
+
+              @Override
+              public RenderShape getRenderShape(BlockState state) { return RenderShape.MODEL; }
+
+              @Nullable
+              @Override
+              public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
+                  return new MonitorBlockEntity(pos, state);
+              }
+
+              @Override
+              public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hit) {
+                  if (player.getItemInHand(hand).isEmpty()) {
+                      if (level.isClientSide()) {
+                          DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ClientGuiOpener.openMonitorScreen(pos));
+                      }
+                      return InteractionResult.sidedSuccess(level.isClientSide());
+                  }
+                  return InteractionResult.PASS;
+              }
+          }
+          EOF
+
+          cat << 'EOF' > src/main/java/com/immersivecctv/block/CameraBlock.java
+          package com.immersivecctv.block;
+
+          import com.immersivecctv.blockentity.CameraBlockEntity;
+          import net.minecraft.core.BlockPos;
+          import net.minecraft.world.level.block.BaseEntityBlock;
+          import net.minecraft.world.level.block.RenderShape;
+          import net.minecraft.world.level.block.entity.BlockEntity;
+          import net.minecraft.world.level.block.state.BlockState;
+          import org.jetbrains.annotations.Nullable;
+
+          public class CameraBlock extends BaseEntityBlock {
+              public CameraBlock(Properties prop) { super(prop); }
+
+              @Override
+              public RenderShape getRenderShape(BlockState state) { return RenderShape.MODEL; }
+
+              @Nullable
+              @Override
+              public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
+                  return new CameraBlockEntity(pos, state);
+              }
+          }
+          EOF
+
+          # 3. Block Entities
+          cat << 'EOF' > src/main/java/com/immersivecctv/blockentity/XvrBlockEntity.java
+          package com.immersivecctv.blockentity;
+
+          import com.immersivecctv.ImmersiveCCTV;
+          import net.minecraft.core.BlockPos;
+          import net.minecraft.nbt.CompoundTag;
+          import net.minecraft.nbt.ListTag;
+          import net.minecraft.nbt.LongTag;
+          import net.minecraft.nbt.Tag;
+          import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+          import net.minecraft.world.level.Level;
+          import net.minecraft.world.level.block.entity.BlockEntity;
+          import net.minecraft.world.level.block.state.BlockState;
+          import java.util.ArrayList;
+          import java.util.List;
+
+          public class XvrBlockEntity extends BlockEntity {
+              private boolean powered = true;
+              private final List<BlockPos> connectedCameras = new ArrayList<>();
+              private BlockPos connectedMonitor = null;
+              public int lanBlinkTimer = 0;
+
+              public XvrBlockEntity(BlockPos pos, BlockState state) {
+                  super(ImmersiveCCTV.XVR_BE.get(), pos, state);
+              }
+
+              public boolean isPowered() { return powered; }
+              public void togglePower() {
+                  this.powered = !this.powered;
+                  setChanged();
+                  if (level != null && !level.isClientSide()) {
+                      level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+                  }
+              }
+
+              public List<BlockPos> getConnectedCameras() { return connectedCameras; }
+              public void addCamera(BlockPos pos) {
+                  if (!connectedCameras.contains(pos)) {
+                      connectedCameras.add(pos);
+                      setChanged();
+                      if (level != null && !level.isClientSide()) {
+                          level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+                      }
+                  }
+              }
+
+              public BlockPos getConnectedMonitor() { return connectedMonitor; }
+              public void setConnectedMonitor(BlockPos pos) {
+                  this.connectedMonitor = pos;
+                  setChanged();
+                  if (level != null && !level.isClientSide()) {
+                      level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+                  }
+              }
+
+              public void tick(Level lvl, BlockPos pos, BlockState state) {
+                  if (powered && !connectedCameras.isEmpty()) {
+                      lanBlinkTimer++;
+                  }
+              }
+
+              @Override
+              protected void saveAdditional(CompoundTag tag) {
+                  super.saveAdditional(tag);
+                  tag.putBoolean("Powered", powered);
+                  if (connectedMonitor != null) {
+                      tag.putLong("Monitor", connectedMonitor.asLong());
+                  }
+                  ListTag list = new ListTag();
+                  for (BlockPos cp : connectedCameras) {
+                      list.add(LongTag.valueOf(cp.asLong()));
+                  }
+                  tag.put("Cameras", list);
+              }
+
+              @Override
+              public void load(CompoundTag tag) {
+                  super.load(tag);
+                  powered = tag.getBoolean("Powered");
+                  if (tag.contains("Monitor")) {
+                      connectedMonitor = BlockPos.of(tag.getLong("Monitor"));
+                  } else {
+                      connectedMonitor = null;
+                  }
+                  connectedCameras.clear();
+                  if (tag.contains("Cameras", Tag.TAG_LIST)) {
+                      ListTag list = tag.getList("Cameras", Tag.TAG_LONG);
+                      for (int i = 0; i < list.size(); i++) {
+                          connectedCameras.add(BlockPos.of(((LongTag) list.get(i)).getAsLong()));
+                      }
+                  }
+              }
+
+              @Override
+              public CompoundTag getUpdateTag() {
+                  CompoundTag tag = new CompoundTag();
+                  saveAdditional(tag);
+                  return tag;
+              }
+
+              @Override
+              public ClientboundBlockEntityDataPacket getUpdatePacket() {
+                  return ClientboundBlockEntityDataPacket.create(this);
+              }
+          }
+          EOF
+
+          cat << 'EOF' > src/main/java/com/immersivecctv/blockentity/MonitorBlockEntity.java
+          package com.immersivecctv.blockentity;
+
+          import com.immersivecctv.ImmersiveCCTV;
+          import net.minecraft.core.BlockPos;
+          import net.minecraft.nbt.CompoundTag;
+          import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+          import net.minecraft.world.level.block.entity.BlockEntity;
+          import net.minecraft.world.level.block.state.BlockState;
+
+          public class MonitorBlockEntity extends BlockEntity {
+              private BlockPos connectedXvr = null;
+
+              public MonitorBlockEntity(BlockPos pos, BlockState state) {
+                  super(ImmersiveCCTV.MONITOR_BE.get(), pos, state);
+              }
+
+              public BlockPos getConnectedXvr() { return connectedXvr; }
+              public void setConnectedXvr(BlockPos pos) {
+                  this.connectedXvr = pos;
+                  setChanged();
+                  if (level != null && !level.isClientSide()) {
+                      level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+                  }
+              }
+
+              @Override
+              protected void saveAdditional(CompoundTag tag) {
+                  super.saveAdditional(tag);
+                  if (connectedXvr != null) {
+                      tag.putLong("XvrPos", connectedXvr.asLong());
+                  }
+              }
+
+              @Override
+              public void load(CompoundTag tag) {
+                  super.load(tag);
+                  if (tag.contains("XvrPos")) {
+                      connectedXvr = BlockPos.of(tag.getLong("XvrPos"));
+                  } else {
+                      connectedXvr = null;
+                  }
+              }
+
+              @Override
+              public CompoundTag getUpdateTag() {
+                  CompoundTag tag = new CompoundTag();
+                  saveAdditional(tag);
+                  return tag;
+              }
+
+              @Override
+              public ClientboundBlockEntityDataPacket getUpdatePacket() {
+                  return ClientboundBlockEntityDataPacket.create(this);
+              }
+          }
+          EOF
+
+          cat << 'EOF' > src/main/java/com/immersivecctv/blockentity/CameraBlockEntity.java
+          package com.immersivecctv.blockentity;
+
+          import com.immersivecctv.ImmersiveCCTV;
+          import net.minecraft.core.BlockPos;
+          import net.minecraft.nbt.CompoundTag;
+          import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+          import net.minecraft.world.level.block.entity.BlockEntity;
+          import net.minecraft.world.level.block.state.BlockState;
+
+          public class CameraBlockEntity extends BlockEntity {
+              private BlockPos connectedXvr = null;
+
+              public CameraBlockEntity(BlockPos pos, BlockState state) {
+                  super(ImmersiveCCTV.CAMERA_BE.get(), pos, state);
+              }
+
+              public BlockPos getConnectedXvr() { return connectedXvr; }
+              public void setConnectedXvr(BlockPos pos) {
+                  this.connectedXvr = pos;
+                  setChanged();
+                  if (level != null && !level.isClientSide()) {
+                      level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+                  }
+              }
+
+              @Override
+              protected void saveAdditional(CompoundTag tag) {
+                  super.saveAdditional(tag);
+                  if (connectedXvr != null) {
+                      tag.putLong("XvrPos", connectedXvr.asLong());
+                  }
+              }
+
+              @Override
+              public void load(CompoundTag tag) {
+                  super.load(tag);
+                  if (tag.contains("XvrPos")) {
+                      connectedXvr = BlockPos.of(tag.getLong("XvrPos"));
+                  } else {
+                      connectedXvr = null;
+                  }
+              }
+
+              @Override
+              public CompoundTag getUpdateTag() {
+                  CompoundTag tag = new CompoundTag();
+                  saveAdditional(tag);
+                  return tag;
+              }
+
+              @Override
+              public ClientboundBlockEntityDataPacket getUpdatePacket() {
+                  return ClientboundBlockEntityDataPacket.create(this);
+              }
+          }
+          EOF
+
+          # 4. Cable Items
+          cat << 'EOF' > src/main/java/com/immersivecctv/item/HdmiCableItem.java
+          package com.immersivecctv.item;
+
+          import com.immersivecctv.blockentity.MonitorBlockEntity;
+          import com.immersivecctv.blockentity.XvrBlockEntity;
+          import net.minecraft.core.BlockPos;
+          import net.minecraft.nbt.CompoundTag;
+          import net.minecraft.network.chat.Component;
+          import net.minecraft.world.InteractionResult;
+          import net.minecraft.world.item.Item;
+          import net.minecraft.world.item.ItemStack;
+          import net.minecraft.world.item.context.UseOnContext;
+          import net.minecraft.world.level.Level;
+          import net.minecraft.world.level.block.entity.BlockEntity;
+
+          public class HdmiCableItem extends Item {
+              public HdmiCableItem(Properties prop) { super(prop); }
+
+              @Override
+              public InteractionResult useOn(UseOnContext ctx) {
+                  Level level = ctx.getLevel();
+                  BlockPos pos = ctx.getClickedPos();
+                  ItemStack stack = ctx.getItemInHand();
+                  CompoundTag tag = stack.getOrCreateTag();
+
+                  if (!level.isClientSide()) {
+                      BlockEntity be = level.getBlockEntity(pos);
+                      if (tag.contains("FirstPos")) {
+                          BlockPos firstPos = BlockPos.of(tag.getLong("FirstPos"));
+                          BlockEntity firstBe = level.getBlockEntity(firstPos);
+                          if (firstBe instanceof MonitorBlockEntity mon && be instanceof XvrBlockEntity xvr) {
+                              mon.setConnectedXvr(pos);
+                              xvr.setConnectedMonitor(firstPos);
+                              tag.remove("FirstPos");
+                              if (ctx.getPlayer() != null) ctx.getPlayer().displayClientMessage(Component.literal("✔ Conexiune HDMI realizată cu succes!"), true);
+                              return InteractionResult.SUCCESS;
+                          } else if (firstBe instanceof XvrBlockEntity xvr && be instanceof MonitorBlockEntity mon) {
+                              mon.setConnectedXvr(firstPos);
+                              xvr.setConnectedMonitor(pos);
+                              tag.remove("FirstPos");
+                              if (ctx.getPlayer() != null) ctx.getPlayer().displayClientMessage(Component.literal("✔ Conexiune HDMI realizată cu succes!"), true);
+                              return InteractionResult.SUCCESS;
+                          } else {
+                              tag.remove("FirstPos");
+                              if (ctx.getPlayer() != null) ctx.getPlayer().displayClientMessage(Component.literal("❌ Conexiune invalidă! Conectați între Monitor și XVR."), true);
+                          }
+                      } else {
+                          if (be instanceof MonitorBlockEntity || be instanceof XvrBlockEntity) {
+                              tag.putLong("FirstPos", pos.asLong());
+                              if (ctx.getPlayer() != null) ctx.getPlayer().displayClientMessage(Component.literal("Cablu conectat la primul aparat. Click pe celălalt capăt!"), true);
+                              return InteractionResult.SUCCESS;
+                          }
+                      }
+                  }
+                  return InteractionResult.sidedSuccess(level.isClientSide());
+              }
+          }
+          EOF
+
+          cat << 'EOF' > src/main/java/com/immersivecctv/item/PoeCableItem.java
+          package com.immersivecctv.item;
+
+          import com.immersivecctv.blockentity.CameraBlockEntity;
+          import com.immersivecctv.blockentity.XvrBlockEntity;
+          import net.minecraft.core.BlockPos;
+          import net.minecraft.nbt.CompoundTag;
+          import net.minecraft.network.chat.Component;
+          import net.minecraft.world.InteractionResult;
+          import net.minecraft.world.item.Item;
+          import net.minecraft.world.item.ItemStack;
+          import net.minecraft.world.item.context.UseOnContext;
+          import net.minecraft.world.level.Level;
+          import net.minecraft.world.level.block.entity.BlockEntity;
+
+          public class PoeCableItem extends Item {
+              public PoeCableItem(Properties prop) { super(prop); }
+
+              @Override
+              public InteractionResult useOn(UseOnContext ctx) {
+                  Level level = ctx.getLevel();
+                  BlockPos pos = ctx.getClickedPos();
+                  ItemStack stack = ctx.getItemInHand();
+                  CompoundTag tag = stack.getOrCreateTag();
+
+                  if (!level.isClientSide()) {
+                      BlockEntity be = level.getBlockEntity(pos);
+                      if (tag.contains("FirstPos")) {
+                          BlockPos firstPos = BlockPos.of(tag.getLong("FirstPos"));
+                          BlockEntity firstBe = level.getBlockEntity(firstPos);
+                          if (firstBe instanceof CameraBlockEntity cam && be instanceof XvrBlockEntity xvr) {
+                              cam.setConnectedXvr(pos);
+                              xvr.addCamera(firstPos);
+                              tag.remove("FirstPos");
+                              if (ctx.getPlayer() != null) ctx.getPlayer().displayClientMessage(Component.literal("✔ Cablu PoE conectat! Cameră alimentată și date active."), true);
+                              return InteractionResult.SUCCESS;
+                          } else if (firstBe instanceof XvrBlockEntity xvr && be instanceof CameraBlockEntity cam) {
+                              cam.setConnectedXvr(firstPos);
+                              xvr.addCamera(pos);
+                              tag.remove("FirstPos");
+                              if (ctx.getPlayer() != null) ctx.getPlayer().displayClientMessage(Component.literal("✔ Cablu PoE conectat! Cameră alimentată și date active."), true);
+                              return InteractionResult.SUCCESS;
+                          } else {
+                              tag.remove("FirstPos");
+                              if (ctx.getPlayer() != null) ctx.getPlayer().displayClientMessage(Component.literal("❌ Conexiune invalidă! Conectați între Cameră și portul PoE al XVR-ului."), true);
+                          }
+                      } else {
+                          if (be instanceof CameraBlockEntity || be instanceof XvrBlockEntity) {
+                              tag.putLong("FirstPos", pos.asLong());
+                              if (ctx.getPlayer() != null) ctx.getPlayer().displayClientMessage(Component.literal("Cablu PoE fixat la primul capăt. Click pe al doilea aparat!"), true);
+                              return InteractionResult.SUCCESS;
+                          }
+                      }
+                  }
+                  return InteractionResult.sidedSuccess(level.isClientSide());
+              }
+          }
+          EOF
+
+          # 5. Client GUI and Renderers
+          cat << 'EOF' > src/main/java/com/immersivecctv/client/ClientGuiOpener.java
+          package com.immersivecctv.client;
+
+          import net.minecraft.client.Minecraft;
+          import net.minecraft.core.BlockPos;
+
+          public class ClientGuiOpener {
+              public static void openMonitorScreen(BlockPos pos) {
+                  Minecraft.getInstance().setScreen(new XvrMonitorScreen(pos));
+              }
+          }
+          EOF
+
+          cat << 'EOF' > src/main/java/com/immersivecctv/client/XvrMonitorScreen.java
+          package com.immersivecctv.client;
+
+          import com.immersivecctv.blockentity.MonitorBlockEntity;
+          import com.immersivecctv.blockentity.XvrBlockEntity;
+          import net.minecraft.client.Minecraft;
+          import net.minecraft.client.gui.GuiGraphics;
+          import net.minecraft.client.gui.screens.Screen;
+          import net.minecraft.core.BlockPos;
+          import net.minecraft.network.chat.Component;
+          import net.minecraft.world.entity.LivingEntity;
+          import net.minecraft.world.level.block.entity.BlockEntity;
+          import net.minecraft.world.phys.AABB;
+          import java.util.List;
+
+          public class XvrMonitorScreen extends Screen {
+              private final BlockPos monitorPos;
+              private int selectedCamIndex = 0;
+              private int bootTicks = 0;
+              private boolean inSettings = false;
+              private int filterMode = 0;
+              private boolean motionAlarmEnabled = true;
+
+              private float bounceX = 50, bounceY = 50;
+              private float velX = 2.0f, velY = 1.5f;
+
+              public XvrMonitorScreen(BlockPos monitorPos) {
+                  super(Component.literal("XVR Surveillance OS"));
+                  this.monitorPos = monitorPos;
+              }
+
+              @Override
+              public void tick() {
+                  super.tick();
+                  bootTicks++;
+              }
+
+              @Override
+              public void render(GuiGraphics gui, int mouseX, int mouseY, float partialTicks) {
+                  gui.fill(0, 0, width, height, 0xFF05070A);
+
+                  Minecraft mc = Minecraft.getInstance();
+                  BlockEntity be = mc.level != null ? mc.level.getBlockEntity(monitorPos) : null;
+                  MonitorBlockEntity monitor = (be instanceof MonitorBlockEntity) ? (MonitorBlockEntity) be : null;
+                  BlockPos xvrPos = monitor != null ? monitor.getConnectedXvr() : null;
+                  BlockEntity xvrBe = (xvrPos != null && mc.level != null) ? mc.level.getBlockEntity(xvrPos) : null;
+                  XvrBlockEntity xvr = (xvrBe instanceof XvrBlockEntity) ? (XvrBlockEntity) xvrBe : null;
+
+                  boolean noSignal = (xvr == null || !xvr.isPowered());
+
+                  if (noSignal) {
+                      renderNoSignalScreensaver(gui);
+                      return;
+                  }
+
+                  if (bootTicks < 60) {
+                      renderBootSequence(gui);
+                      return;
+                  }
+
+                  if (inSettings) {
+                      renderSettingsMenu(gui, mouseX, mouseY);
+                  } else {
+                      renderLiveSurveillance(gui, xvr, mouseX, mouseY);
+                  }
+              }
+
+              private void renderNoSignalScreensaver(GuiGraphics gui) {
+                  bounceX += velX;
+                  bounceY += velY;
+                  if (bounceX < 10 || bounceX > width - 180) velX = -velX;
+                  if (bounceY < 10 || bounceY > height - 40) velY = -velY;
+
+                  gui.fill((int)bounceX, (int)bounceY, (int)bounceX + 170, (int)bounceY + 35, 0xCCAA0000);
+                  gui.renderOutline((int)bounceX, (int)bounceY, 170, 35, 0xFFFF5555);
+                  gui.drawString(font, "● LIPSĂ SEMNAL (NO SIGNAL)", (int)bounceX + 8, (int)bounceY + 6, 0xFFFFFFFF, false);
+                  gui.drawString(font, "Verifică HDMI sau Alimentare XVR", (int)bounceX + 8, (int)bounceY + 18, 0xFFFFAAAA, false);
+              }
+
+              private void renderBootSequence(GuiGraphics gui) {
+                  int cy = height / 2 - 40;
+                  gui.drawCenteredString(font, "=== IMMERSIVE XVR SURVEILLANCE SYSTEM ===", width / 2, cy, 0xFF00FFCC);
+                  if (bootTicks > 15) gui.drawString(font, "> Încărcare Firmware v4.2.0-PRO... [OK]", width / 2 - 120, cy + 25, 0xFF55FF55, false);
+                  if (bootTicks > 30) gui.drawString(font, "> Inițializare 8x Porturi RJ45 PoE... [OK]", width / 2 - 120, cy + 40, 0xFF55FF55, false);
+                  if (bootTicks > 45) gui.drawString(font, "> Verificare integritate HDD RAID... [SĂNĂTOS]", width / 2 - 120, cy + 55, 0xFF55FF55, false);
+              }
+
+              private void renderLiveSurveillance(GuiGraphics gui, XvrBlockEntity xvr, int mouseX, int mouseY) {
+                  Minecraft mc = Minecraft.getInstance();
+                  gui.fill(0, 0, width, 24, 0xEE11151C);
+                  boolean recBlink = (System.currentTimeMillis() / 600) % 2 == 0;
+                  if (recBlink) {
+                      gui.fill(10, 8, 18, 16, 0xFFFF0000);
+                      gui.drawString(font, "REC [LIVE]", 24, 8, 0xFFFF2222, false);
+                  } else {
+                      gui.drawString(font, "REC [LIVE]", 24, 8, 0xFF882222, false);
+                  }
+
+                  gui.drawString(font, "XVR-8CH HD | STATUS: ONLINE | PoE 48V ACTIV", 100, 8, 0xFF00FFCC, false);
+                  gui.drawString(font, "[SETĂRI XVR]", width - 90, 8, isHovering(mouseX, mouseY, width - 95, 4, 80, 16) ? 0xFFFFFF00 : 0xFFAAAAAA, false);
+
+                  int feedX = 20, feedY = 32, feedW = width - 40, feedH = height - 70;
+                  gui.fill(feedX, feedY, feedX + feedW, feedY + feedH, 0xFF080D14);
+                  gui.renderOutline(feedX, feedY, feedW, feedH, 0xFF224466);
+
+                  if (filterMode == 1) {
+                      gui.fill(feedX, feedY, feedX + feedW, feedY + feedH, 0x3300FF33);
+                  } else if (filterMode == 2) {
+                      gui.fill(feedX, feedY, feedX + feedW, feedY + feedH, 0x33FF0055);
+                  }
+
+                  for (int y = feedY; y < feedY + feedH; y += 4) {
+                      gui.fill(feedX, y, feedX + feedW, y + 1, 0x1A000000);
+                  }
+
+                  int cx = feedX + feedW / 2, cy = feedY + feedH / 2;
+                  gui.fill(cx - 15, cy, cx + 15, cy + 1, 0x66FFFFFF);
+                  gui.fill(cx, cy - 15, cx, cy + 15, 0x66FFFFFF);
+
+                  List<BlockPos> cams = xvr.getConnectedCameras();
+                  if (cams.isEmpty()) {
+                      gui.drawCenteredString(font, "NICIO CAMERĂ CONECTATĂ PE PORTURILE POE", cx, cy - 10, 0xFF888888);
+                      gui.drawCenteredString(font, "Trageți un cablu PoE de la cameră la unitatea XVR", cx, cy + 5, 0xFF555555);
+                  } else {
+                      if (selectedCamIndex >= cams.size()) selectedCamIndex = 0;
+                      BlockPos camPos = cams.get(selectedCamIndex);
+                      gui.drawString(font, "CAM 0" + (selectedCamIndex + 1) + " [" + camPos.getX() + ", " + camPos.getY() + ", " + camPos.getZ() + "]", feedX + 10, feedY + 10, 0xFF00FFCC, false);
+
+                      if (mc.level != null && motionAlarmEnabled) {
+                          AABB scanArea = new AABB(camPos).inflate(14.0);
+                          List<LivingEntity> entities = mc.level.getEntitiesOfClass(LivingEntity.class, scanArea, e -> e != mc.player);
+                          int ey = feedY + 28;
+                          if (!entities.isEmpty()) {
+                              gui.drawString(font, "⚠️ ALARMĂ: MIȘCARE DETECTATĂ ÎN PERIMETRU!", feedX + 10, ey, 0xFFFF3333, false);
+                              ey += 14;
+                              for (int i = 0; i < Math.min(entities.size(), 4); i++) {
+                                  LivingEntity target = entities.get(i);
+                                  double dist = Math.round(target.distanceToSqr(camPos.getX(), camPos.getY(), camPos.getZ()) * 10.0) / 10.0;
+                                  gui.drawString(font, "[AI ȚINTĂ] " + target.getName().getString() + " - " + Math.round(Math.sqrt(dist)) + "m", feedX + 10, ey, 0xFFFFCC00, false);
+                                  ey += 12;
+                              }
+                          } else {
+                              gui.drawString(font, "RADAR MIȘCARE AI: NICIUN INTRUS", feedX + 10, ey, 0xFF44AA44, false);
+                          }
+                      }
+                  }
+
+                  int btnY = height - 30;
+                  for (int i = 0; i < 4; i++) {
+                      int bx = 20 + i * 85;
+                      boolean active = (i == selectedCamIndex);
+                      gui.fill(bx, btnY, bx + 75, btnY + 20, active ? 0xFF005577 : 0xFF1A222D);
+                      gui.renderOutline(bx, btnY, 75, 20, active ? 0xFF00FFCC : 0xFF334455);
+                      gui.drawCenteredString(font, "CAM 0" + (i + 1), bx + 37, btnY + 6, active ? 0xFFFFFFFF : 0xFFAAAAAA);
+                  }
+              }
+
+              private void renderSettingsMenu(GuiGraphics gui, int mouseX, int mouseY) {
+                  int mx = width / 2 - 120, my = height / 2 - 80;
+                  gui.fill(mx, my, mx + 240, my + 160, 0xFA151C24);
+                  gui.renderOutline(mx, my, 240, 160, 0xFF00FFCC);
+
+                  gui.drawCenteredString(font, "=== MENIU SETĂRI XVR ===", width / 2, my + 10, 0xFFFFFFFF);
+
+                  String filterName = filterMode == 0 ? "STANDARD HD" : (filterMode == 1 ? "NIGHT-VISION IR" : "THERMAL SCAN");
+                  gui.drawString(font, "Filtru Video: " + filterName, mx + 20, my + 38, 0xFFCCCCCC, false);
+                  gui.drawString(font, "[SCHIMBĂ FILTRU]", mx + 20, my + 52, 0xFF00FFCC, false);
+
+                  gui.drawString(font, "Alarmă Mișcare: " + (motionAlarmEnabled ? "ACTIVATĂ" : "OPRITĂ"), mx + 20, my + 75, motionAlarmEnabled ? 0xFF55FF55 : 0xFFFF5555, false);
+                  gui.drawString(font, "[COMUTĂ ALARMĂ]", mx + 20, my + 89, 0xFF00FFCC, false);
+
+                  gui.drawString(font, "Stocare: HDD 2.4 TB [Sănătos - 82% Liber]", mx + 20, my + 112, 0xFFAAAAAA, false);
+
+                  gui.drawString(font, "[ÎNAPOI LA CAMERE]", mx + 60, my + 135, 0xFFFFFF00, false);
+              }
+
+              @Override
+              public boolean mouseClicked(double mouseX, double mouseY, int button) {
+                  if (inSettings) {
+                      int mx = width / 2 - 120, my = height / 2 - 80;
+                      if (isHovering(mouseX, mouseY, mx + 20, my + 50, 120, 15)) {
+                          filterMode = (filterMode + 1) % 3;
+                          return true;
+                      }
+                      if (isHovering(mouseX, mouseY, mx + 20, my + 87, 120, 15)) {
+                          motionAlarmEnabled = !motionAlarmEnabled;
+                          return true;
+                      }
+                      if (isHovering(mouseX, mouseY, mx + 60, my + 132, 120, 18)) {
+                          inSettings = false;
+                          return true;
+                      }
+                  } else {
+                      if (isHovering(mouseX, mouseY, width - 95, 4, 80, 16)) {
+                          inSettings = true;
+                          return true;
+                      }
+                      int btnY = height - 30;
+                      for (int i = 0; i < 4; i++) {
+                          int bx = 20 + i * 85;
+                          if (isHovering(mouseX, mouseY, bx, btnY, 75, 20)) {
+                              selectedCamIndex = i;
+                              return true;
+                          }
+                      }
+                  }
+                  return super.mouseClicked(mouseX, mouseY, button);
+              }
+
+              private boolean isHovering(double mx, double my, int x, int y, int w, int h) {
+                  return mx >= x && mx <= x + w && my >= y && my <= y + h;
+              }
+
+              @Override
+              public boolean isPauseScreen() { return false; }
+          }
+          EOF
+
+          cat << 'EOF' > src/main/java/com/immersivecctv/client/MonitorRenderer.java
+          package com.immersivecctv.client;
+
+          import com.immersivecctv.blockentity.MonitorBlockEntity;
+          import com.immersivecctv.blockentity.XvrBlockEntity;
+          import com.mojang.blaze3d.vertex.PoseStack;
+          import com.mojang.blaze3d.vertex.VertexConsumer;
+          import net.minecraft.client.Minecraft;
+          import net.minecraft.client.gui.Font;
+          import net.minecraft.client.renderer.MultiBufferSource;
+          import net.minecraft.client.renderer.RenderType;
+          import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
+          import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
+          import net.minecraft.core.BlockPos;
+          import net.minecraft.world.level.Level;
+          import net.minecraft.world.level.block.entity.BlockEntity;
+          import org.joml.Matrix4f;
+
+          public class MonitorRenderer implements BlockEntityRenderer<MonitorBlockEntity> {
+              public MonitorRenderer(BlockEntityRendererProvider.Context ctx) {}
+
+              @Override
+              public void render(MonitorBlockEntity monitor, float partialTicks, PoseStack poseStack, MultiBufferSource buffer, int packedLight, int packedOverlay) {
+                  Level level = monitor.getLevel();
+                  if (level == null) return;
+
+                  BlockPos xvrPos = monitor.getConnectedXvr();
+                  BlockEntity be = xvrPos != null ? level.getBlockEntity(xvrPos) : null;
+                  XvrBlockEntity xvr = (be instanceof XvrBlockEntity) ? (XvrBlockEntity) be : null;
+
+                  poseStack.pushPose();
+                  poseStack.translate(0.5, 0.65, 0.36);
+                  poseStack.scale(-0.015f, -0.015f, 0.015f);
+
+                  Font font = Minecraft.getInstance().font;
+                  Matrix4f mat = poseStack.last().pose();
+
+                  if (xvr == null || !xvr.isPowered()) {
+                      boolean blink = (System.currentTimeMillis() / 500) % 2 == 0;
+                      int color = blink ? 0xFFFF0000 : 0xFF660000;
+                      font.drawInBatch("● NO SIGNAL", -30, 0, color, false, mat, buffer, Font.DisplayMode.NORMAL, 0, packedLight);
+                  } else {
+                      boolean recBlink = (System.currentTimeMillis() / 600) % 2 == 0;
+                      int recColor = recBlink ? 0xFFFF2222 : 0xFF770000;
+                      font.drawInBatch("● REC", -32, -8, recColor, false, mat, buffer, Font.DisplayMode.NORMAL, 0, 15728880);
+                      font.drawInBatch("XVR LIVE", 2, -8, 0xFF00FFCC, false, mat, buffer, Font.DisplayMode.NORMAL, 0, 15728880);
+                      font.drawInBatch("CAM 01: ACTIVĂ", -32, 2, 0xFF55FF55, false, mat, buffer, Font.DisplayMode.NORMAL, 0, 15728880);
+                      font.drawInBatch("[" + monitor.getBlockPos().toShortString() + "]", -32, 12, 0xFF888888, false, mat, buffer, Font.DisplayMode.NORMAL, 0, 15728880);
+                  }
+                  poseStack.popPose();
+
+                  if (xvrPos != null) {
+                      renderCable(monitor.getBlockPos(), xvrPos, poseStack, buffer, 0.12f, 0.12f, 0.14f);
+                  }
+              }
+
+              public static void renderCable(BlockPos start, BlockPos end, PoseStack poseStack, MultiBufferSource buffer, float r, float g, float b) {
+                  poseStack.pushPose();
+                  VertexConsumer vc = buffer.getBuffer(RenderType.lines());
+                  Matrix4f matrix = poseStack.last().pose();
+
+                  double dx = end.getX() - start.getX();
+                  double dy = end.getY() - start.getY();
+                  double dz = end.getZ() - start.getZ();
+
+                  double startX = 0.5, startY = 0.3, startZ = 0.5;
+                  double endX = dx + 0.5, endY = dy + 0.3, endZ = dz + 0.5;
+
+                  int segments = 16;
+                  double prevX = startX, prevY = startY, prevZ = startZ;
+
+                  for (int i = 1; i <= segments; i++) {
+                      double t = (double) i / segments;
+                      double curX = startX + (endX - startX) * t;
+                      double curZ = startZ + (endZ - startZ) * t;
+                      double droop = 0.5 * Math.sin(t * Math.PI);
+                      double curY = startY + (endY - startY) * t - droop;
+
+                      vc.vertex(matrix, (float) prevX, (float) prevY, (float) prevZ).color(r, g, b, 1.0f).normal(0.0f, 1.0f, 0.0f).endVertex();
+                      vc.vertex(matrix, (float) curX, (float) curY, (float) curZ).color(r, g, b, 1.0f).normal(0.0f, 1.0f, 0.0f).endVertex();
+
+                      prevX = curX;
+                      prevY = curY;
+                      prevZ = curZ;
+                  }
+                  poseStack.popPose();
+              }
+          }
+          EOF
+
+          cat << 'EOF' > src/main/java/com/immersivecctv/client/XvrRenderer.java
+          package com.immersivecctv.client;
+
+          import com.immersivecctv.blockentity.XvrBlockEntity;
+          import com.mojang.blaze3d.vertex.PoseStack;
+          import net.minecraft.client.renderer.MultiBufferSource;
+          import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
+          import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
+          import net.minecraft.core.BlockPos;
+
+          public class XvrRenderer implements BlockEntityRenderer<XvrBlockEntity> {
+              public XvrRenderer(BlockEntityRendererProvider.Context ctx) {}
+
+              @Override
+              public void render(XvrBlockEntity xvr, float partialTicks, PoseStack poseStack, MultiBufferSource buffer, int packedLight, int packedOverlay) {
+                  if (xvr.getLevel() == null) return;
+                  for (BlockPos camPos : xvr.getConnectedCameras()) {
+                      MonitorRenderer.renderCable(xvr.getBlockPos(), camPos, poseStack, buffer, 0.0f, 0.45f, 0.9f);
+                  }
+              }
+          }
+          EOF
+
+          cat << 'EOF' > src/main/java/com/immersivecctv/client/ClientModEvents.java
+          package com.immersivecctv.client;
+
+          import com.immersivecctv.ImmersiveCCTV;
+          import net.minecraftforge.api.distmarker.Dist;
+          import net.minecraftforge.client.event.EntityRenderersEvent;
+          import net.minecraftforge.eventbus.api.SubscribeEvent;
+          import net.minecraftforge.fml.common.Mod;
+
+          @Mod.EventBusSubscriber(modid = ImmersiveCCTV.MODID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
+          public class ClientModEvents {
+              @SubscribeEvent
+              public static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
+                  event.registerBlockEntityRenderer(ImmersiveCCTV.MONITOR_BE.get(), MonitorRenderer::new);
+                  event.registerBlockEntityRenderer(ImmersiveCCTV.XVR_BE.get(), XvrRenderer::new);
+              }
+          }
+          EOF
+
+      - name: Verify Gradle Version
+        run: gradle --version
+
+      - name: Build Mod with Gradle
+        run: gradle build --no-daemon --stacktrace
+
+      - name: Prepare Artifact
+        run: |
+          mkdir -p output
+          cp build/libs/*.jar output/
+          cd output && zip -r immersive-cctv-mod-1.20.1.zip .
+
+      - name: Upload Mod Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Immersive-CCTV-Forge-1.20.1
+          path: output/immersive-cctv-mod-1.20.1.zip
