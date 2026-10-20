@@ -1,6 +1,7 @@
 package ro.immersivecctv;
 
 import java.util.function.Supplier;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -188,10 +189,10 @@ public final class CctvNetwork {
             ctx.enqueueWork(() -> {
                 ServerPlayer player = ctx.getSender();
                 if (player == null) return;
-                List<EndpointEntry> entries = new java.util.ArrayList<>();
+                List<ScanEntry> entries = new java.util.ArrayList<>();
                 for (XvrBlockEntity xvr : nearbyXvrs(player)) {
                     boolean reachable = xvr.canObtainCloudEndpoint();
-                    entries.add(new EndpointEntry(xvr.getBlockPos(), xvr.getConfiguredCloudIp(),
+                    entries.add(new ScanEntry(xvr.getBlockPos(), xvr.getConfiguredCloudIp(),
                             xvr.getConfiguredCloudPort(), reachable));
                     if (entries.size() >= 64) break;
                 }
@@ -201,14 +202,14 @@ public final class CctvNetwork {
         }
     }
 
-    private record EndpointEntry(BlockPos pos, String host, String port, boolean reachable) { }
+    public record ScanEntry(BlockPos pos, String host, String port, boolean reachable) { }
 
-    private record CloudScanResult(List<EndpointEntry> entries) {
+    private record CloudScanResult(List<ScanEntry> entries) {
         private static void encode(CloudScanResult msg, FriendlyByteBuf buf) {
             int count = Math.min(64, msg.entries == null ? 0 : msg.entries.size());
             buf.writeVarInt(count);
             for (int i = 0; i < count; i++) {
-                EndpointEntry entry = msg.entries.get(i);
+                ScanEntry entry = msg.entries.get(i);
                 buf.writeBlockPos(entry.pos());
                 buf.writeUtf(entry.host(), 64);
                 buf.writeUtf(entry.port(), 8);
@@ -217,9 +218,9 @@ public final class CctvNetwork {
         }
         private static CloudScanResult decode(FriendlyByteBuf buf) {
             int count = Math.max(0, Math.min(64, buf.readVarInt()));
-            List<EndpointEntry> entries = new java.util.ArrayList<>(count);
+            List<ScanEntry> entries = new java.util.ArrayList<>(count);
             for (int i = 0; i < count; i++) {
-                entries.add(new EndpointEntry(buf.readBlockPos(), buf.readUtf(64), buf.readUtf(8), buf.readBoolean()));
+                entries.add(new ScanEntry(buf.readBlockPos(), buf.readUtf(64), buf.readUtf(8), buf.readBoolean()));
             }
             return new CloudScanResult(entries);
         }
