@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "immersivecctv:block/internet_block"
+    }
+  }
+}

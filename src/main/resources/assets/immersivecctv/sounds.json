@@ -1,0 +1,1802 @@
+{
+  "xvr_power_on": {
+    "sounds": [
+      {
+        "name": "immersivecctv:xvr_power_on",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.xvr_power_on"
+  },
+  "xvr_power_off": {
+    "sounds": [
+      {
+        "name": "immersivecctv:xvr_power_off",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.xvr_power_off"
+  },
+  "ac_adapter_connect": {
+    "sounds": [
+      {
+        "name": "immersivecctv:ac_adapter_connect",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.ac_adapter_connect"
+  },
+  "mains_power_connect": {
+    "sounds": [
+      {
+        "name": "immersivecctv:mains_power_connect",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.mains_power_connect"
+  },
+  "hdmi_connect": {
+    "sounds": [
+      {
+        "name": "immersivecctv:hdmi_connect",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.hdmi_connect"
+  },
+  "poe_connect": {
+    "sounds": [
+      {
+        "name": "immersivecctv:poe_connect",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.poe_connect"
+  },
+  "camera_restart": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_restart",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_restart"
+  },
+  "camera_enable": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_enable",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_enable"
+  },
+  "camera_disable": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_disable",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_disable"
+  },
+  "monitor_power_on": {
+    "sounds": [
+      {
+        "name": "immersivecctv:monitor_power_on",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.monitor_power_on"
+  },
+  "boot_ready": {
+    "sounds": [
+      {
+        "name": "immersivecctv:boot_ready",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.boot_ready"
+  },
+  "boot_fail": {
+    "sounds": [
+      {
+        "name": "immersivecctv:boot_fail",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.boot_fail"
+  },
+  "no_signal": {
+    "sounds": [
+      {
+        "name": "immersivecctv:no_signal",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.no_signal"
+  },
+  "alarm_on": {
+    "sounds": [
+      {
+        "name": "immersivecctv:alarm_on",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.alarm_on"
+  },
+  "alarm_off": {
+    "sounds": [
+      {
+        "name": "immersivecctv:alarm_off",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.alarm_off"
+  },
+  "button_click": {
+    "sounds": [
+      {
+        "name": "immersivecctv:button_click",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.button_click"
+  },
+  "startup_beep_01": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_01",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_02": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_02",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_03": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_03",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_04": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_04",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_05": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_05",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_06": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_06",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_07": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_07",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_08": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_08",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_09": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_09",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_10": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_10",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_11": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_11",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_12": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_12",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_13": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_13",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_14": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_14",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_15": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_15",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_16": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_16",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_17": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_17",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_18": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_18",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_19": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_19",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_20": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_20",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_21": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_21",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_22": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_22",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_23": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_23",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_24": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_24",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_25": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_25",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_26": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_26",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_27": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_27",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_28": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_28",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_29": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_29",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_30": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_30",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_31": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_31",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_32": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_32",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_33": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_33",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_34": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_34",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_35": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_35",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_36": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_36",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_37": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_37",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_38": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_38",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_39": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_39",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_40": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_40",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_41": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_41",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_42": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_42",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_43": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_43",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_44": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_44",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_45": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_45",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_46": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_46",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_47": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_47",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "startup_beep_48": {
+    "sounds": [
+      {
+        "name": "immersivecctv:startup_beep_48",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.startup_beep"
+  },
+  "camera_link_01": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_01",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_02": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_02",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_03": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_03",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_04": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_04",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_05": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_05",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_06": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_06",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_07": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_07",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_08": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_08",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_09": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_09",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_10": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_10",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_11": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_11",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_12": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_12",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_13": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_13",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_14": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_14",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_15": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_15",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_16": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_16",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_17": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_17",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_18": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_18",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_19": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_19",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_20": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_20",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_21": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_21",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_22": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_22",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_23": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_23",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_24": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_24",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_25": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_25",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_26": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_26",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_27": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_27",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_28": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_28",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_29": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_29",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_30": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_30",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_31": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_31",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_32": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_32",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_33": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_33",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_34": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_34",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_35": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_35",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_36": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_36",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_37": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_37",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_38": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_38",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_39": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_39",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_40": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_40",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_41": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_41",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_42": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_42",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_43": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_43",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_44": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_44",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_45": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_45",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_46": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_46",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_47": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_47",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "camera_link_48": {
+    "sounds": [
+      {
+        "name": "immersivecctv:camera_link_48",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.camera_link"
+  },
+  "drive_seek_01": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_01",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_02": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_02",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_03": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_03",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_04": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_04",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_05": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_05",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_06": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_06",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_07": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_07",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_08": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_08",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_09": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_09",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_10": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_10",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_11": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_11",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_12": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_12",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_13": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_13",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_14": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_14",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_15": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_15",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_16": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_16",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_17": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_17",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_18": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_18",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_19": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_19",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_20": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_20",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_21": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_21",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_22": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_22",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_23": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_23",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_24": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_24",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_25": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_25",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_26": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_26",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_27": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_27",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_28": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_28",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_29": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_29",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_30": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_30",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_31": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_31",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_32": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_32",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_33": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_33",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_34": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_34",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_35": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_35",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_36": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_36",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_37": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_37",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_38": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_38",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_39": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_39",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_40": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_40",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_41": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_41",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_42": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_42",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_43": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_43",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "drive_seek_44": {
+    "sounds": [
+      {
+        "name": "immersivecctv:drive_seek_44",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.drive_seek"
+  },
+  "relay_click_01": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_01",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_02": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_02",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_03": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_03",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_04": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_04",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_05": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_05",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_06": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_06",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_07": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_07",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_08": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_08",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_09": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_09",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_10": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_10",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_11": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_11",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_12": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_12",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_13": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_13",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_14": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_14",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_15": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_15",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_16": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_16",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_17": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_17",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_18": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_18",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_19": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_19",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_20": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_20",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_21": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_21",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_22": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_22",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_23": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_23",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_24": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_24",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_25": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_25",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_26": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_26",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_27": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_27",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_28": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_28",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_29": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_29",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_30": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_30",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_31": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_31",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_32": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_32",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_33": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_33",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_34": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_34",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_35": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_35",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_36": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_36",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_37": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_37",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_38": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_38",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_39": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_39",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_40": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_40",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_41": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_41",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_42": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_42",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_43": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_43",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  },
+  "relay_click_44": {
+    "sounds": [
+      {
+        "name": "immersivecctv:relay_click_44",
+        "volume": 0.8
+      }
+    ],
+    "subtitle": "subtitles.immersivecctv.relay_click"
+  }
+}

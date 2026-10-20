@@ -1,0 +1,31 @@
+{
+  "display": {
+    "icon": {
+      "item": "immersivecctv:xvr"
+    },
+    "title": {
+      "text": "Eye in the Control Room"
+    },
+    "description": {
+      "text": "Craft your first XVR surveillance recorder."
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false,
+    "background": "immersivecctv:textures/block/brushed_steel.png"
+  },
+  "criteria": {
+    "crafted_xvr": {
+      "trigger": "minecraft:recipe_crafted",
+      "conditions": {
+        "recipe_id": "immersivecctv:xvr"
+      }
+    }
+  },
+  "requirements": [
+    [
+      "crafted_xvr"
+    ]
+  ]
+}

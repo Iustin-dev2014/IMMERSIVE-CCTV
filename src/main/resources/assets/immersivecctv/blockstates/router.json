@@ -1,0 +1,162 @@
+{
+  "multipart": [
+    {
+      "apply": {
+        "model": "immersivecctv:block/router_off"
+      },
+      "when": {
+        "powered": "false"
+      }
+    },
+    {
+      "apply": {
+        "model": "immersivecctv:block/router_signal_loss"
+      },
+      "when": {
+        "powered": "true",
+        "internet": "false"
+      }
+    },
+    {
+      "apply": {
+        "model": "immersivecctv:block/router_online"
+      },
+      "when": {
+        "powered": "true",
+        "internet": "true"
+      }
+    },
+    {
+      "apply": {
+        "model": "immersivecctv:block/router_lan0"
+      },
+      "when": {
+        "OR": [
+          {
+            "lan_mask": "1"
+          },
+          {
+            "lan_mask": "3"
+          },
+          {
+            "lan_mask": "5"
+          },
+          {
+            "lan_mask": "7"
+          },
+          {
+            "lan_mask": "9"
+          },
+          {
+            "lan_mask": "11"
+          },
+          {
+            "lan_mask": "13"
+          },
+          {
+            "lan_mask": "15"
+          }
+        ]
+      }
+    },
+    {
+      "apply": {
+        "model": "immersivecctv:block/router_lan1"
+      },
+      "when": {
+        "OR": [
+          {
+            "lan_mask": "2"
+          },
+          {
+            "lan_mask": "3"
+          },
+          {
+            "lan_mask": "6"
+          },
+          {
+            "lan_mask": "7"
+          },
+          {
+            "lan_mask": "10"
+          },
+          {
+            "lan_mask": "11"
+          },
+          {
+            "lan_mask": "14"
+          },
+          {
+            "lan_mask": "15"
+          }
+        ]
+      }
+    },
+    {
+      "apply": {
+        "model": "immersivecctv:block/router_lan2"
+      },
+      "when": {
+        "OR": [
+          {
+            "lan_mask": "4"
+          },
+          {
+            "lan_mask": "5"
+          },
+          {
+            "lan_mask": "6"
+          },
+          {
+            "lan_mask": "7"
+          },
+          {
+            "lan_mask": "12"
+          },
+          {
+            "lan_mask": "13"
+          },
+          {
+            "lan_mask": "14"
+          },
+          {
+            "lan_mask": "15"
+          }
+        ]
+      }
+    },
+    {
+      "apply": {
+        "model": "immersivecctv:block/router_lan3"
+      },
+      "when": {
+        "OR": [
+          {
+            "lan_mask": "8"
+          },
+          {
+            "lan_mask": "9"
+          },
+          {
+            "lan_mask": "10"
+          },
+          {
+            "lan_mask": "11"
+          },
+          {
+            "lan_mask": "12"
+          },
+          {
+            "lan_mask": "13"
+          },
+          {
+            "lan_mask": "14"
+          },
+          {
+            "lan_mask": "15"
+          }
+        ]
+      }
+    }
+  ]
+}

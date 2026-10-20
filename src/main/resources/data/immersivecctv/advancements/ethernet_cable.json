@@ -1,0 +1,31 @@
+{
+  "parent": "immersivecctv:root",
+  "display": {
+    "icon": {
+      "item": "immersivecctv:ethernet_cable"
+    },
+    "title": {
+      "text": "Local Network"
+    },
+    "description": {
+      "text": "Craft an Ethernet lead for router LAN to XVR WAN."
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "crafted_ethernet_cable": {
+      "trigger": "minecraft:recipe_crafted",
+      "conditions": {
+        "recipe_id": "immersivecctv:ethernet_cable"
+      }
+    }
+  },
+  "requirements": [
+    [
+      "crafted_ethernet_cable"
+    ]
+  ]
+}

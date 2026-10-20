@@ -1,0 +1,31 @@
+{
+  "parent": "immersivecctv:root",
+  "display": {
+    "icon": {
+      "item": "immersivecctv:internet_block"
+    },
+    "title": {
+      "text": "Fibre Distribution"
+    },
+    "description": {
+      "text": "Craft an Internet Block with five optical-fibre ports."
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "crafted_internet_block": {
+      "trigger": "minecraft:recipe_crafted",
+      "conditions": {
+        "recipe_id": "immersivecctv:internet_block"
+      }
+    }
+  },
+  "requirements": [
+    [
+      "crafted_internet_block"
+    ]
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "parent": "immersivecctv:root",
+  "display": {
+    "icon": {
+      "item": "immersivecctv:cloud_access_remote"
+    },
+    "title": {
+      "text": "Cloud Console"
+    },
+    "description": {
+      "text": "Craft a remote terminal for authenticated XVR cloud access."
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "crafted_cloud_access_remote": {
+      "trigger": "minecraft:recipe_crafted",
+      "conditions": {
+        "recipe_id": "immersivecctv:cloud_access_remote"
+      }
+    }
+  },
+  "requirements": [
+    [
+      "crafted_cloud_access_remote"
+    ]
+  ]
+}

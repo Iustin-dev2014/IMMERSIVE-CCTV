@@ -1,0 +1,21 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="MIT"
+[[mods]]
+modId="immersivecctv"
+version="${file.jarVersion}"
+displayName="Immersive CCTV"
+authors="Iustin Martac"
+description='''Immersive CCTV surveillance for Minecraft 1.20.1: XVR console, native world-rendered camera views, PTZ cameras, password-protected camera onboarding, recipes and crafting advancements. Created by Iustin Martac.'''
+[[dependencies.immersivecctv]]
+modId="forge"
+mandatory=true
+versionRange="[47.2.0,48)"
+ordering="NONE"
+side="BOTH"
+[[dependencies.immersivecctv]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.20.1,1.20.2)"
+ordering="NONE"
+side="BOTH"

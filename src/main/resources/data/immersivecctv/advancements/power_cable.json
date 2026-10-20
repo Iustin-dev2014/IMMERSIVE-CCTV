@@ -1,0 +1,31 @@
+{
+  "parent": "immersivecctv:root",
+  "display": {
+    "icon": {
+      "item": "immersivecctv:power_cable"
+    },
+    "title": {
+      "text": "Wired for Power"
+    },
+    "description": {
+      "text": "Craft a power cable for your equipment."
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "crafted_power_cable": {
+      "trigger": "minecraft:recipe_crafted",
+      "conditions": {
+        "recipe_id": "immersivecctv:power_cable"
+      }
+    }
+  },
+  "requirements": [
+    [
+      "crafted_power_cable"
+    ]
+  ]
+}

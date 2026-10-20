@@ -1,184 +1,78 @@
-# IMMERSIVE-CCTV
+# IMMERSIVE CCTV — v1.4.0-beta.4 (development candidate)
 
-Versiune: 1.0.0  
-Mod ID: `immersivecctv`  
-Autor: ImmersiveCCTV Dev  
-Licență: MIT
+**Author:** Iustin Martac  
+**Minecraft:** Java Edition 1.20.1  
+**Mod loader:** Minecraft Forge 47.2.x  
+**Java:** 17  
+**Release status:** unpublished development candidate derived from the public beta.3 source; do not publish as stable until CI and in-game testing pass.
 
----
+IMMERSIVE CCTV adds a physical-feeling CCTV installation to Minecraft: an XVR recorder, monitor, fixed camera, motorized PTZ camera, wall outlet, power hardware and cables. The project is designed for security rooms, factories, roleplay builds, research bases and other technical constructions.
 
-## Ce este (pe scurt)
-IMMERSIVE-CCTV este un mod Minecraft (Forge) care adaugă un set de blocuri și obiecte ce simulează un sistem profesional CCTV: unitate centrală XVR, monitoare CCTV, camere bullet și cabluri (HDMI, PoE). Modul include logica de conectare între dispozitive, GUI pentru monitor, entități de bloc pentru a păstra starea și asset-uri (texturi, modele JSON) generate automat.
+## Highlights
 
-Am dedus aceasta din conținutul fișierelor din `.github/workflows/` (în special `main.yml`) care conțin scripturi ce generează structura proiectului, `build.gradle`, fișiere Java (pachetele `com.immersivecctv.*`), JSON-uri pentru modele/blockstates și script Python (Pillow) pentru generarea texturilor.
+- **Native Minecraft live-camera rendering:** when a camera has been authenticated, the monitor console switches Minecraft's camera viewpoint to the CCTV camera. The feed is rendered through the normal world renderer rather than synthesizing the picture from per-pixel block raycasts. While the console is open, the camera temporarily switches to first-person perspective and player HUD overlays are hidden so the monitor viewport is not covered by the hotbar or crosshair. This is intended to preserve the game's actual block models, textures, entity models, animation, lighting, fluids and particles. The camera view is cropped into a 16:9 monitor window in the XVR UI.
+- **Faster PTZ controls:** PTZ commands change pan by 60 degrees and tilt by 35 degrees per button press; tilt is clamped to a usable range and HOME resets the PTZ position.
+- **First-start XVR setup:** the first working console start asks the player to create an administrator username and password. The setup flag and salted password hash are stored in the XVR block entity; replacing a broken XVR starts setup again.
+- **Per-camera credentials:** each camera receives a unique UUID, username `admin`, and initial password `0000`. Hold the **CCTV Service Tool** and right-click a camera to display its ID and credential status. The first successful default-password login requires a new password before video is enabled.
+- **Server-validated device commands:** credential checks, password changes, PTZ movements and camera controls are validated by the server. Passwords are stored as salted SHA-256 hashes rather than plaintext NBT values.
+- **Crafting recipes:** recipes are provided for the XVR, monitor, fixed camera, PTZ camera, outlet, HDMI cable, PoE Cat6 cable, 12V AC charger, power cable and service tool.
+- **Advancements:** crafting the XVR, monitor, cameras, outlet, cables, charger and service tool unlocks custom advancements and toast notifications.
+- **Physical connection and power flow:** use compatible power, HDMI and PoE cables to link the camera, recorder and monitor. The XVR and router require a 12V adapter, a power cable and a powered wall outlet.
+- **New in this development candidate — router and fibre infrastructure:** the desktop router has a red signal-loss state until its fibre lead is connected to one of the five ports on an Internet Block. Its four LAN ports can be wired individually to the XVR WAN port. The four LAN activity indicators blink when a powered XVR is linked on the corresponding port. The XVR front panel now represents the PoE-camera link and powered-router WAN link separately from power/status indicators.
+- **In-game endpoint diagnostics:** use the CCTV Service Tool on an XVR to inspect its simulated IP/port. Both fields show `Cannot obtain!` until the XVR is powered, the router WAN/LAN path is connected and powered, and the optical uplink reaches the Internet Block. These addresses are simulated Minecraft endpoints, not public Internet addresses.
+- **Local DVR snapshots:** while an authenticated live console is open, the client saves periodic frames locally for playback. This is a client-side snapshot feature, not server-side surveillance recording while nobody is viewing the console.
+- **English and Romanian names:** item/block language files are included for `en_us` and `ro_ro`.
 
----
+## Installation
 
-## Ce conține (preview rapid)
-- Blocuri: `xvr_unit`, `cctv_monitor`, `bullet_camera`
-- Iteme: `hdmi_cable`, `poe_cable`
-- BlockEntities cu persistare NBT: `XvrBlockEntity`, `MonitorBlockEntity`, `CameraBlockEntity`
-- GUI client: `XvrMonitorScreen` + utilitar `ClientGuiOpener`
-- Assets generate: texturi 64x64 (PIL), modele JSON, blockstates, localization `en_us.json`
-- Gradle + ForgeGradle config pentru Minecraft 1.20.1 (dependință: `net.minecraftforge:forge:1.20.1-47.2.0`)
+1. Install **Minecraft Java Edition 1.20.1**.
+2. Install a compatible **Minecraft Forge 1.20.1 / 47.x** profile.
+3. Launch once to create the game directory, then close Minecraft.
+4. Copy the compiled `immersivecctv-1.4.0.jar` to the `.minecraft/mods` folder.
+5. Start Minecraft with the Forge profile.
 
----
+For development, use **JDK 17**. The build uses ForgeGradle 6 and Forge `1.20.1-47.2.0`.
 
-## Funcționalități cheie (detaliat)
-- XVR (XvrBlock & XvrBlockEntity)
-  - Toggle power la right-click (când mâna goală). Stare reținută în NBT (`Powered`).
-  - Păstrează listă de camere conectate (`Cameras`) și poziția monitorului conectat (`Monitor`).
-  - `lanBlinkTimer` pentru efecte vizuale/logică periodică (tick).
-- Monitor (MonitorBlock & MonitorBlockEntity)
-  - Right-click cu mâna goală deschide un GUI (client-side): `XvrMonitorScreen`.
-  - Stochează poziția XVR-ului la care este conectat (`XvrPos`).
-- Cameră Bullet (CameraBlock & CameraBlockEntity)
-  - Entitate de bloc care păstrează poziția XVR-ului conectat (`XvrPos`) — folosită cu cablul PoE.
-- Cablu HDMI (HdmiCableItem)
-  - Mecanism de conectare în două etape: la primul click stochează `FirstPos` în NBT-ul itemului, la al doilea verifică tipurile de block entity (Monitor ↔ XVR) și creează legătura.
-  - Mesaje feedback în chat (mesaje în Română în cod: ex. "✔ Conexiune HDMI realizată cu succes!").
-- Cablu PoE (PoeCableItem)
-  - Similar HDMI, dar conectează `CameraBlockEntity` cu `XvrBlockEntity`. Mesaje de feedback pentru conexiuni corecte/erronate.
-- Assets & Models
-  - Script Python (PIL) generează texturi 64x64 pentru blocuri (xvr_top, xvr_side, xvr_front, camera_lens etc.) și pentru iteme (hdmi_cable, poe_cable).
-  - JSON-urile pentru `models/` și `blockstates/` sunt generate în workflow pentru a atașa texturi la blocuri și iteme.
-- Creative Tab
-  - Modul declară o categorie creativă `immersivecctv_tab` cu iconă XVR și adaugă toate itemele/blocurile.
+## First setup and camera onboarding
 
----
+1. Place the XVR, monitor, camera/PTZ camera, wall outlet and required power hardware.
+2. Connect the monitor to the XVR with HDMI and connect cameras to the eight front PoE ports with PoE Cat6.
+3. Power the XVR, monitor and router using a 12V charger, wall outlet and Power Cable for each device.
+4. (Optional network hardware) Connect a router LAN 1–4 port to the XVR's rear WAN jack with the Ethernet Network Cable. Connect the router's rear fibre jack to one of the five top ports on the Internet Block with the Fibre Optic Cable.
+5. Open the monitor console and wait for the first boot animation.
+6. On the first active start, create an XVR administrator username and password. This setup is saved for that placed XVR; it is not an XVR login prompt on every subsequent opening.
+7. Craft and hold the **CCTV Service Tool**, then right-click a newly placed camera to view its unique ID and initial credentials (`admin` / `0000`).
+8. Return to the XVR console, select the connected camera and enter its username and password. After the first successful default login, choose a new password to enable its live feed.
+9. PTZ cameras support pan, tilt and HOME controls. Open XVR SETTINGS for camera controls and device management.
 
-## Unde am găsit informațiile (probe)
-- `.github/workflows/main.yml` — conține pași expliciți care:
-  - Setează Java 17, instalează Gradle 8.5 și Python 3.10.
-  - Rulează scripturi `cat << 'EOF' > ...` care creează `settings.gradle`, `build.gradle`, `gradle.properties`.
-  - Generează resurse în `src/main/resources/assets/immersivecctv/...` (json, texturi).
-  - Generează cod Java complet în `src/main/java/com/immersivecctv/...` (clasele menționate mai sus).
-- `README.md` din repo curent e momentan minimal (un singur header). De aceea propun acest README extins.
+**Security note:** the default camera credentials are intentionally predictable for initial setup. Change them immediately when prompted. Do not reuse a personal password.
 
----
+## Crafting and advancements
 
-## Structura proiectului (așa cum o generează workflow-ul)
-(fișiere generate automat de workflow în `src/`)
+The mod supplies recipes and custom crafting advancements for all primary pieces of the CCTV system. Recipes use vanilla materials and the mod's own items, and are stored under `src/main/resources/data/immersivecctv/recipes/`. Advancement JSONs are stored under `src/main/resources/data/immersivecctv/advancements/`.
 
-```
-src/
-  main/
-    java/
-      com/immersivecctv/
-        ImmersiveCCTV.java            # înregistrări DeferredRegister (blocks, items, block entities, creative tab)
-        block/
-          XvrBlock.java
-          MonitorBlock.java
-          CameraBlock.java
-        blockentity/
-          XvrBlockEntity.java
-          MonitorBlockEntity.java
-          CameraBlockEntity.java
-        item/
-          HdmiCableItem.java
-          PoeCableItem.java
-        client/
-          ClientGuiOpener.java
-          XvrMonitorScreen.java
-    resources/
-      META-INF/
-        mods.toml                      # metadata mod (modId, version, description, deps)
-      assets/immersivecctv/
-        lang/en_us.json
-        blockstates/*.json
-        models/block/*.json
-        models/item/*.json
-        textures/block/*.png          # generate via PIL
-        textures/item/*.png           # generate via PIL
-build.gradle                          # ForgeGradle setup (1.20.1)
-settings.gradle
-gradle.properties
+## Build from source
+
+Prerequisites: JDK 17, Python 3, Gradle 8.x, and FFmpeg with Ogg/Vorbis encoding support.
+
+```text
+python3 scripts/generate_textures.py
+python3 scripts/generate_sounds.py
+gradle --no-daemon build
 ```
 
-Cum se leagă între ele
-- `ImmersiveCCTV.java` înregistrează blocurile, itemele și BlockEntityType-urile — acesta este punctul central de boot al modului.
-- Blocurile creează BlockEntities care stochează legături și stare. Itemele (cablu) interacționează cu BlockEntities pentru a forma legături.
-- Modelele/blockstates/texturile sunt consumate la runtime pentru a afișa blocurile/itemele.
+The mod JAR is written under `build/libs/`. A GitHub Actions workflow is included at `.github/workflows/build.yml`; it generates assets, builds the mod and uploads the resulting JAR as a workflow artifact.
 
----
+This complete **source ZIP is provided for Minecraft/modding enthusiasts** who want to explore the Java code, resources and build configuration. Generated audio and texture assets are also included for convenience.
 
-## Cum să rulezi local (instrucțiuni practice)
-Notă: Repozitorul curent conține workflow care *generează* fișierele la CI. Pentru dezvoltare locală recomand să reproduceți pașii din workflow și să comiteți fișierele generate (sau rulați workflow pe GitHub Actions).
+## Known limits / validation notes
 
-1. Cerințe
-   - Java 17 (temurin adoptium recomandat)
-   - Gradle 8.5 (sau wrapper setat la 8.5)
-   - Python 3.10+ și pip (pentru Pillow)
-   - Conexiune la internet pentru a descărca dependențele Forge
+- The live view is rendered by switching the local client renderer's camera entity while the XVR screen is open. If the native framebuffer appears entirely black, the UI now falls back to a progressive block-raycast preview sampled from loaded client chunks. This fallback preserves a visible picture but cannot reproduce entity models/animations, skin textures, particles, fluids or some transparent block details. The native feed and fallback both need in-game testing on Forge 1.20.1, especially with shaders and mods that manipulate the active camera.
+- This candidate implements physical router/fibre/LAN/WAN state and endpoint diagnostics, but **does not yet implement the Cloud Access Remote login and remote live-video streaming UI**. A genuine remote view needs server-authoritative authentication and a feed transport for camera chunks that are not loaded on the client; showing a fake successful remote session would be misleading.
+- Local recording stores sampled frames from the rendered camera window while the console is open. It does not capture a continuous stream while the UI is closed.
+- Camera login status is maintained by the camera block entity, so the current authorization model is device/world state rather than an independent permission list per player.
+- Forge compilation and an actual Minecraft client launch must be confirmed on a machine with the required Gradle/Forge dependencies. Static resource checks alone do not prove the game starts without errors.
 
-2. Pași minimali (pe Linux/macOS, în terminal)
-   - Clonați repo:
-     git clone https://github.com/iustinmartac20140-dev/IMMERSIVE-CCTV.git
-     cd IMMERSIVE-CCTV
-   - (Opțional) Reproduceți pașii de generare din workflow local:
-     - Creați directoarele și fișierele (sau rulați scriptul din workflow local)
-     - Instalați pillow:
-       pip3 install pillow
-     - Dacă nu aveți wrapper: instalați Gradle 8.5 sau creați wrapper:
-       gradle wrapper --gradle-version 8.5
-   - Rulează build / client:
-     ./gradlew --no-daemon build
-     ./gradlew --no-daemon runClient
-   - Observații:
-     - `runClient` pornește o instanță de Minecraft de dezvoltare (Forge) cu mod-ul încărcat, dacă dependențele Forge se rezolvă corect.
-     - Dacă întâmpinați probleme cu dependențele Forge (maven.minecraftforge.net), verificați setările de rețea / proxy.
+## Thanks & feedback
 
-3. Alternativ — folosește GitHub Actions
-   - Workflow-ul `.github/workflows/main.yml` instalează Gradle 8.5 și Python + Pillow și generează proiectul. Poți declanșa workflow manual (Actions → run workflow) sau face push la branch.
-
----
-
-## Sugestii practice / Observații despre repo
-- Observație importantă: În prezent branch-ul `main` conține doar workflow-ul care *creează* codul și resursele la execuție. Pentru o dezvoltare mai convenabilă pe mașina locală, e recomandat să rulați scriptul o dată, verificați fișierele generate și apoi să comiteți codul sursă în repo (adică fișierele din `src/`, `build.gradle`, `settings.gradle`, `gradle.properties`). Altfel, cine clonează repo nu are cod sursă direct fără a rula workflow-ul.
-- Mesaje în cod: multe mesaje de feedback în iteme sunt în română — se pot lăsa așa sau internaționaliza.
-- Dependențe: projektul folosește Forge 1.20.1 (versiunea indicată în build.gradle generat). Asigurați-vă că folosiți exact acea versiune pentru compatibilitate.
-
----
-
-## Probleme cunoscute și lucruri de verificat
-- Workflow-urile din `.github/workflows/` conțin multe versiuni / copii: `build(2).yml`, `build(3).yml` etc. Curățare/normalizare ar ajuta.
-- Scriptul de generare în workflow conține porțiuni tăiate/trunchiate în unele fișiere (vezi linii cu `[...]` în YAML extras). Verificați ca toate fișierele Java generate să fie complete înainte de a construi.
-- ForgeGradle poate necesita versiuni specifice de Gradle/Java; folosiți Java 17 + Gradle 8.5 cum configurează workflow-ul.
-
----
-
-## Roadmap / Funcționalități posibile
-- Integrare reală a semnalelor video (în joc, simulare de fluxuri video pe monitor).
-- Suport pentru mai multe tipuri de camere/porturi (PTZ, night-vision toggles).
-- Persistență avansată / salvare de configurări per XVR (layout camere, etichete).
-- Sistem de alertare / motion detection in-game (alrimi vizuale/sonore).
-
----
-
-## Cum poți contribui
-- Dacă dorești, pot:
-  - crea fișierul README.md în repo (commit) — spune-mi branch-ul țintă,
-  - rula local scriptul de generare și comite fișierele `src/` generate,
-  - curăța și unifica workflow-urile duplicate și versiunile lor.
-- Sugestii de PR: extracție de resurse, documentare pentru dezvoltare locală, adăugare `gradlew` wrapper, example world/test map.
-
----
-
-## Întrebări la care te pot ajuta imediat
-- Vrei să comit acest README.md în repo? Pe ce branch?
-- Vrei să generez și să comit fișierele `src/` create de workflow astfel încât repo-ul să conțină codul sursă?
-- Preferi să păstrăm mesajele din joc în română sau să le facem bilingual (en/ro)?
-
----
-
-## Referințe din repo (path-uri utile)
-- `.github/workflows/main.yml` — script de generare și build CI
-- `src/main/java/com/immersivecctv/ImmersiveCCTV.java` — entrypoint (generat în workflow)
-- `src/main/java/com/immersivecctv/block/XvrBlock.java` — comportament XVR
-- `src/main/java/com/immersivecctv/item/HdmiCableItem.java` — logica de conectare HDMI
-- `src/main/resources/META-INF/mods.toml` — metadata mod (modId, versiune, description)
-- `src/main/resources/assets/immersivecctv/lang/en_us.json` — localizare
-
----
-
-Mulțumesc — am parcurs și analizat `.github/workflows` și fișierele top-level pentru a construi acest README detaliat. Spune-mi dacă vrei să-l adaug direct în repository (îl pot crea / comite) sau dacă vrei o versiune prescurtată/extendată.
+Bug reports should include the exact Minecraft version, Forge version, Java version, relevant logs and reliable steps to reproduce the issue. Suggestions and careful testing help prepare the first stable release.

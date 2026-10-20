@@ -1,0 +1,31 @@
+{
+  "parent": "immersivecctv:root",
+  "display": {
+    "icon": {
+      "item": "immersivecctv:ac_charger"
+    },
+    "title": {
+      "text": "Twelve Volts"
+    },
+    "description": {
+      "text": "Craft the XVR 12V AC charger."
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "crafted_ac_charger": {
+      "trigger": "minecraft:recipe_crafted",
+      "conditions": {
+        "recipe_id": "immersivecctv:ac_charger"
+      }
+    }
+  },
+  "requirements": [
+    [
+      "crafted_ac_charger"
+    ]
+  ]
+}

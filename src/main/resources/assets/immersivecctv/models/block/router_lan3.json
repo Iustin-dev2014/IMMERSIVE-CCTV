@@ -1,0 +1,40 @@
+{
+  "textures": {
+    "particle": "immersivecctv:block/white",
+    "light": "immersivecctv:block/led_green"
+  },
+  "elements": [
+    {
+      "from": [
+        12,
+        4.1,
+        1.85
+      ],
+      "to": [
+        13.2,
+        4.8,
+        2.05
+      ],
+      "faces": {
+        "north": {
+          "texture": "#light"
+        },
+        "south": {
+          "texture": "#light"
+        },
+        "east": {
+          "texture": "#light"
+        },
+        "west": {
+          "texture": "#light"
+        },
+        "up": {
+          "texture": "#light"
+        },
+        "down": {
+          "texture": "#light"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "parent": "immersivecctv:root",
+  "display": {
+    "icon": {
+      "item": "immersivecctv:router"
+    },
+    "title": {
+      "text": "12V Network Ready"
+    },
+    "description": {
+      "text": "Craft a router to connect an XVR to the network."
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "crafted_router": {
+      "trigger": "minecraft:recipe_crafted",
+      "conditions": {
+        "recipe_id": "immersivecctv:router"
+      }
+    }
+  },
+  "requirements": [
+    [
+      "crafted_router"
+    ]
+  ]
+}

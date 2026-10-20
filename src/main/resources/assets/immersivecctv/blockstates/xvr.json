@@ -1,0 +1,28 @@
+{
+  "variants": {
+    "powered=false,poe_link=false,wan_link=false": {
+      "model": "immersivecctv:block/xvr_off_p0_w0"
+    },
+    "powered=false,poe_link=false,wan_link=true": {
+      "model": "immersivecctv:block/xvr_off_p0_w1"
+    },
+    "powered=false,poe_link=true,wan_link=false": {
+      "model": "immersivecctv:block/xvr_off_p1_w0"
+    },
+    "powered=false,poe_link=true,wan_link=true": {
+      "model": "immersivecctv:block/xvr_off_p1_w1"
+    },
+    "powered=true,poe_link=false,wan_link=false": {
+      "model": "immersivecctv:block/xvr_on_p0_w0"
+    },
+    "powered=true,poe_link=false,wan_link=true": {
+      "model": "immersivecctv:block/xvr_on_p0_w1"
+    },
+    "powered=true,poe_link=true,wan_link=false": {
+      "model": "immersivecctv:block/xvr_on_p1_w0"
+    },
+    "powered=true,poe_link=true,wan_link=true": {
+      "model": "immersivecctv:block/xvr_on_p1_w1"
+    }
+  }
+}
