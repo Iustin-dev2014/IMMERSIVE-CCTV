@@ -517,14 +517,15 @@ public class XvrScreen extends Screen {
             formSubmittedAt = 0L;
         }
         CameraBlockEntity activeCamera = cameraPos == null ? null : cameraEntity(cameraPos);
-        boolean nativeCameraFeed = live && !booting && activeXvr != null && activeXvr.isAccountConfigured()
+        // Use the camera-lens raycast renderer for the monitor viewport. Capturing the player's
+        // main framebuffer while swapping the active Minecraft camera entity can capture the
+        // player's own scene (including the monitor/XVR) instead of a stable camera-origin feed.
+        // The fallback renderer traces rays from the selected camera's actual position and facing.
+        boolean nativeCameraFeed = false;
+        boolean cameraFeedAvailable = live && !booting && activeXvr != null && activeXvr.isAccountConfigured()
                 && !playback && cameraPos != null && activeCamera != null && activeCamera.isOnline()
                 && activeCamera.isAuthenticated() && !activeCamera.mustChangePassword() && Minecraft.getInstance().level != null;
-        if (nativeCameraFeed) {
-            CameraViewController.show(cameraPos, cameraFacing(cameraPos), activeCamera.getPanDegrees(), activeCamera.getTiltDegrees());
-        } else {
-            CameraViewController.restore();
-        }
+        CameraViewController.restore();
         int margin = 2;
         int top = 60;
         int bottom = height - 2;
@@ -649,12 +650,8 @@ public class XvrScreen extends Screen {
         } else {
             if (playback) {
                 drawCameraPixels(g, viewX, viewY, viewW, viewH);
-            } else if (nativeCameraFeed) {
-                captureNativeFeedFrame(cameraPos, viewX, viewY, viewW, viewH, now);
-                // Keep the real world-rendered view when it is valid; if a renderer, shader, or camera
-                // lifecycle issue produces a black frame, fall back to the textured preview so the
-                // CCTV monitor never silently becomes a completely black rectangle.
-                if (!nativeFeedLooksValid) fallbackRenderer.render(g, cameraPos, filter, viewX, viewY, viewW, viewH);
+            } else if (cameraFeedAvailable) {
+                fallbackRenderer.render(g, cameraPos, filter, viewX, viewY, viewW, viewH);
             } else {
                 drawNoCameraPattern(g, viewX, viewY, viewX + viewW, viewY + viewH);
             }
