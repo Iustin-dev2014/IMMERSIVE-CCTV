@@ -21,6 +21,10 @@ public final class ClientHooks {
         Minecraft.getInstance().setScreen(new CloudRemoteLoginScreen(xvrPos));
     }
 
+    public static void openCloudRemoteLogin() {
+        Minecraft.getInstance().setScreen(new CloudRemoteLoginScreen());
+    }
+
     public static void onCloudLoginResult(boolean success, BlockPos xvrPos, String message) {
         if (Minecraft.getInstance().screen instanceof CloudRemoteLoginScreen screen) {
             screen.showResult(success, message);
