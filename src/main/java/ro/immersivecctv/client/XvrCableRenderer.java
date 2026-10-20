@@ -105,7 +105,6 @@ public class XvrCableRenderer implements BlockEntityRenderer<XvrBlockEntity> {
         int routerPort = be.getRouterLanPort();
         if (routerPos != null && routerPort >= 0 && routerPort < 4
                 && be.getLevel().getBlockEntity(routerPos) instanceof RouterBlockEntity router
-                && routerPos.equals(router.getLanXvr(routerPort))
                 && be.getBlockPos().equals(router.getLanXvr(routerPort))) {
             // A link is rendered only when both block entities agree on the same physical connection.
             Vec3 lanPort = new Vec3(0.82, 0.18, -0.012);
