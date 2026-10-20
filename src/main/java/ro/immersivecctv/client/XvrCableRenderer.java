@@ -107,15 +107,26 @@ public class XvrCableRenderer implements BlockEntityRenderer<XvrBlockEntity> {
                 && be.getLevel().getBlockEntity(routerPos) instanceof RouterBlockEntity router
                 && be.getBlockPos().equals(router.getLanXvr(routerPort))) {
             // A link is rendered only when both block entities agree on the same physical connection.
-            Vec3 lanPort = new Vec3(0.82, 0.18, -0.012);
-            Vec3 lanDrop = new Vec3(lanPort.x, 0.035, -0.12);
-            Vec3 routerPortPos = new Vec3(routerPos.getX() - be.getBlockPos().getX() + 0.5,
+            // The XVR's dedicated rear WAN RJ45 is above its HDMI socket; do not draw
+            // the router cable on top of one of the front PoE camera jacks.
+            Vec3 lanPort = new Vec3(0.5, 0.3125, 1.046875);
+            Vec3 lanDrop = new Vec3(lanPort.x, 0.035, lanPort.z + 0.12);
+            // Four physical LAN sockets are spaced across the router's rear panel.
+            double routerPortX = switch (routerPort) {
+                case 0 -> 0.109375;
+                case 1 -> 0.296875;
+                case 2 -> 0.484375;
+                default -> 0.671875;
+            };
+            Vec3 routerPortPos = new Vec3(routerPos.getX() - be.getBlockPos().getX() + routerPortX,
                     routerPos.getY() - be.getBlockPos().getY() + 0.20,
                     routerPos.getZ() - be.getBlockPos().getZ() + 0.985);
             Vec3 routerDrop = new Vec3(routerPortPos.x, 0.035, routerPortPos.z + 0.10);
             List<Vec3> lanRoute = floorRoute(lanPort, lanDrop, routerDrop, routerPortPos, false);
-            drawTubePath(vc, pose, lanRoute, 0.030, 0xFF111820, 0xFF36A8D8, packedLight, packedOverlay);
-            drawConnector(vc, pose, lanPort, new Vec3(0, 0, -1), false, packedLight, packedOverlay);
+            // A thick, opaque rubber jacket with a blue Cat6 highlight makes the link readable
+            // at normal gameplay distance. The drops at each end and floor-level route model gravity.
+            drawTubePath(vc, pose, lanRoute, 0.036, 0xFF0B1116, 0xFF36A8D8, packedLight, packedOverlay);
+            drawConnector(vc, pose, lanPort, new Vec3(0, 0, 1), false, packedLight, packedOverlay);
             drawConnector(vc, pose, routerPortPos, new Vec3(0, 0, 1), false, packedLight, packedOverlay);
         }
 
