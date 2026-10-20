@@ -1,2 +1,2 @@
 Temporary GitHub permission audit probe.
-Stage: create
+Stage: update verified
