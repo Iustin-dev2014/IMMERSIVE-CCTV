@@ -43,6 +43,18 @@ public class MonitorBlock extends Block implements EntityBlock {
     }
 
     @Override
+    public void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean isMoving) {
+        if (!state.is(newState.getBlock()) && !level.isClientSide
+                && level.getBlockEntity(pos) instanceof MonitorBlockEntity monitor) {
+            BlockPos xvrPos = monitor.getXvrPos();
+            if (xvrPos != null && level.getBlockEntity(xvrPos) instanceof XvrBlockEntity xvr
+                    && pos.equals(xvr.getMonitorPos())) xvr.setMonitorPos(null);
+            monitor.setXvrPos(null);
+        }
+        super.onRemove(state, level, pos, newState, isMoving);
+    }
+
+    @Override
     public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hit) {
         if (hand != InteractionHand.MAIN_HAND) return InteractionResult.PASS;
         if (!player.getItemInHand(hand).isEmpty()) return InteractionResult.PASS;
