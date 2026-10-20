@@ -120,18 +120,28 @@ def make_front(on):
 make_front(True).save(BLOCK/'xvr_front_on.png')
 make_front(False).save(BLOCK/'xvr_front_off.png')
 
-# Four independent front-panel status LEDs: HDD/red, WAN/blue, power/green, PoE/yellow.
-# These textures are selected by live BlockState properties, rather than a decorative always-on label.
+# Round status lamps only: red HDD, blue WAN, green power and amber PoE.
+# The rectangular overlay set was removed to avoid duplicated indicators.
 def make_front_status(powered, poe_link, wan_link):
     c = make_front(powered)
-    active = [(235,55,55,255) if powered else (66,26,27,255),
-              (69,166,255,255) if wan_link else (23,44,61,255),
-              (76,241,129,255) if powered else (24,52,34,255),
-              (255,202,60,255) if poe_link else (60,47,22,255)]
-    for i, color in enumerate(active):
-        x = 35 + i * 7
-        c.rect(x, 2, x + 3, 5, color)
-        c.rect(x, 2, x + 3, 2, tuple(min(255, int(ch * 1.2)) for ch in color[:3]) + (255,))
+    lamps = [
+        (35, (235, 55, 55, 255) if powered else (75, 27, 29, 255)),
+        (42, (69, 166, 255, 255) if wan_link else (24, 44, 61, 255)),
+        (49, (76, 241, 129, 255) if powered else (24, 52, 34, 255)),
+        (57, (255, 224, 94, 255) if poe_link else (60, 47, 22, 255)),
+    ]
+    cy = 4
+    for cx, color in lamps:
+        # Dark bezel ring with a circular illuminated core.
+        for y in range(cy - 3, cy + 4):
+            for x in range(cx - 3, cx + 4):
+                d2 = (x - cx) ** 2 + (y - cy) ** 2
+                if d2 <= 9:
+                    c.rect(x, y, x + 1, y + 1, (9, 13, 16, 255))
+                if 2 <= d2 <= 5:
+                    c.rect(x, y, x + 1, y + 1, color)
+                elif d2 <= 1:
+                    c.rect(x, y, x + 1, y + 1, tuple(min(255, int(ch * 1.08)) for ch in color[:3]) + (255,))
     c.noise(1)
     suffix = ('on' if powered else 'off') + '_p' + str(int(poe_link)) + '_w' + str(int(wan_link))
     c.save(BLOCK / ('xvr_front_' + suffix + '.png'))
