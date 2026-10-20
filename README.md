@@ -1,3 +1,6 @@
+             WARNING:
+The version mentioned in this file refers to a later version of the mod, which is not yet available for download! Please do not report that this file describes a version that does not exist, as you have been warned above!
+
 # IMMERSIVE CCTV — v1.4.0-beta.4 (development candidate)
 
 **Author:** Iustin Martac  
