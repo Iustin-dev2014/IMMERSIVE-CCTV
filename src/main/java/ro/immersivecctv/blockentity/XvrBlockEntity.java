@@ -51,8 +51,8 @@ public class XvrBlockEntity extends BlockEntity {
         return routerPos != null && level.getBlockEntity(routerPos) instanceof RouterBlockEntity router && router.hasInternet();
     }
 
-    public String getCloudIp() {
-        if (!canObtainCloudEndpoint()) return "Cannot obtain";
+    /** Stable simulated address used by the remote terminal; it is not a public Internet address. */
+    public String getConfiguredCloudIp() {
         UUID id = safeNetworkAddressId();
         long high = id.getMostSignificantBits();
         int a = (int) ((high >>> 40) & 255L);
@@ -61,17 +61,31 @@ public class XvrBlockEntity extends BlockEntity {
         return "10." + a + "." + b + "." + c;
     }
 
-    public String getCloudPort() {
-        if (!canObtainCloudEndpoint()) return "Cannot obtain";
+    public String getConfiguredCloudPort() {
         UUID id = safeNetworkAddressId();
         long low = id.getLeastSignificantBits();
         int value = (int) Math.floorMod(low ^ (low >>> 32), 50000L);
         return Integer.toString(10000 + value);
     }
 
+    /** Display address only when the endpoint is actually reachable right now. */
+    public String getCloudIp() { return canObtainCloudEndpoint() ? getConfiguredCloudIp() : "Cannot obtain"; }
+    public String getCloudPort() { return canObtainCloudEndpoint() ? getConfiguredCloudPort() : "Cannot obtain"; }
+
+    /** Server-side lookup helper; callers must still verify canObtainCloudEndpoint before login. */
+    public boolean matchesConfiguredEndpoint(String host, String port) {
+        return host != null && port != null
+                && getConfiguredCloudIp().equals(host.trim())
+                && getConfiguredCloudPort().equals(port.trim());
+    }
+
     private UUID safeNetworkAddressId() {
         try { return UUID.fromString(networkAddressId); }
-        catch (IllegalArgumentException ex) { networkAddressId = UUID.randomUUID().toString(); return UUID.fromString(networkAddressId); }
+        catch (IllegalArgumentException ex) {
+            networkAddressId = UUID.randomUUID().toString();
+            setChanged();
+            return UUID.fromString(networkAddressId);
+        }
     }
 
     /** The first console setup is permanent for this placed XVR. Breaking it removes this data. */
