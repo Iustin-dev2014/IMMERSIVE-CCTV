@@ -23,6 +23,9 @@ import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import ro.immersivecctv.LinkingManager;
 import ro.immersivecctv.blockentity.XvrBlockEntity;
+import ro.immersivecctv.blockentity.RouterBlockEntity;
+import ro.immersivecctv.blockentity.MonitorBlockEntity;
+import ro.immersivecctv.blockentity.CameraBlockEntity;
 
 public class XvrBlock extends Block implements EntityBlock {
     public static final BooleanProperty POWERED = BooleanProperty.create("powered");
@@ -62,6 +65,25 @@ public class XvrBlock extends Block implements EntityBlock {
                 XvrBlockEntity.serverTick(tickLevel, tickPos, tickState, xvr);
             }
         };
+    }
+
+    @Override
+    public void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean isMoving) {
+        if (!state.is(newState.getBlock()) && !level.isClientSide
+                && level.getBlockEntity(pos) instanceof XvrBlockEntity xvr) {
+            BlockPos monitorPos = xvr.getMonitorPos();
+            if (monitorPos != null && level.getBlockEntity(monitorPos) instanceof MonitorBlockEntity monitor
+                    && pos.equals(monitor.getXvrPos())) monitor.setXvrPos(null);
+            for (BlockPos cameraPos : xvr.getCameras()) {
+                if (level.getBlockEntity(cameraPos) instanceof CameraBlockEntity camera
+                        && pos.equals(camera.getXvrPos())) camera.setXvrPos(null);
+            }
+            BlockPos routerPos = xvr.getRouterPos();
+            int port = xvr.getRouterLanPort();
+            if (routerPos != null && port >= 0 && level.getBlockEntity(routerPos) instanceof RouterBlockEntity router
+                    && pos.equals(router.getLanXvr(port))) router.disconnectXvr(port);
+        }
+        super.onRemove(state, level, pos, newState, isMoving);
     }
 
     @Override
