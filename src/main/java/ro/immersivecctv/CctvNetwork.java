@@ -118,7 +118,8 @@ public final class CctvNetwork {
             for (int cz = minChunkZ; cz <= maxChunkZ; cz++) {
                 var chunk = level.getChunkSource().getChunk(cx, cz, ChunkStatus.FULL, false);
                 if (chunk == null) continue; // Never force-load terrain merely to scan a remote.
-                for (BlockEntity be : chunk.getBlockEntities().values()) {
+                for (BlockPos blockEntityPos : chunk.getBlockEntitiesPos()) {
+                    BlockEntity be = chunk.getBlockEntity(blockEntityPos);
                     if (!(be instanceof XvrBlockEntity xvr) || !seen.add(xvr.getBlockPos())) continue;
                     if (xvr.getBlockPos().distToCenterSqr(player.getX(), player.getY(), player.getZ()) <= 100.0D * 100.0D) {
                         found.add(xvr);
