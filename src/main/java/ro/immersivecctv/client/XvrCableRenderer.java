@@ -18,6 +18,7 @@ import ro.immersivecctv.block.PowerOutletBlock;
 import ro.immersivecctv.block.XvrBlock;
 import ro.immersivecctv.blockentity.CameraBlockEntity;
 import ro.immersivecctv.blockentity.MonitorBlockEntity;
+import ro.immersivecctv.blockentity.RouterBlockEntity;
 import ro.immersivecctv.blockentity.XvrBlockEntity;
 
 /** Draws thick, floor-routed cables and three functional front-panel status lamps. */
@@ -96,6 +97,37 @@ public class XvrCableRenderer implements BlockEntityRenderer<XvrBlockEntity> {
             drawTubePath(vc, pose, powerRoute, 0.024, 0xFF101315, 0xFFC5A24D, packedLight, packedOverlay);
             drawPowerPlug(vc, pose, xvrPower, new Vec3(0, 0, 1), packedLight, packedOverlay);
             drawPowerPlug(vc, pose, wallPort.position(), wallPort.outward(), packedLight, packedOverlay);
+        }
+
+        // Visible Ethernet cable between the XVR LAN jack and the exact router LAN port.
+        // Route down to the floor first, then across the floor, and finally up into the router.
+        BlockPos routerPos = be.getRouterPos();
+        int routerPort = be.getRouterLanPort();
+        if (routerPos != null && routerPort >= 0 && routerPort < 4
+                && be.getLevel().getBlockEntity(routerPos) instanceof RouterBlockEntity router
+                && be.getBlockPos().equals(router.getLanXvr(routerPort))) {
+            // A link is rendered only when both block entities agree on the same physical connection.
+            // The XVR's dedicated rear WAN RJ45 is above its HDMI socket; do not draw
+            // the router cable on top of one of the front PoE camera jacks.
+            Vec3 lanPort = new Vec3(0.5, 0.3125, 1.046875);
+            Vec3 lanDrop = new Vec3(lanPort.x, 0.035, lanPort.z + 0.12);
+            // Four physical LAN sockets are spaced across the router's rear panel.
+            double routerPortX = switch (routerPort) {
+                case 0 -> 0.109375;
+                case 1 -> 0.296875;
+                case 2 -> 0.484375;
+                default -> 0.671875;
+            };
+            Vec3 routerPortPos = new Vec3(routerPos.getX() - be.getBlockPos().getX() + routerPortX,
+                    routerPos.getY() - be.getBlockPos().getY() + 0.20,
+                    routerPos.getZ() - be.getBlockPos().getZ() + 0.985);
+            Vec3 routerDrop = new Vec3(routerPortPos.x, 0.035, routerPortPos.z + 0.10);
+            List<Vec3> lanRoute = floorRoute(lanPort, lanDrop, routerDrop, routerPortPos, false);
+            // A thick, opaque rubber jacket with a blue Cat6 highlight makes the link readable
+            // at normal gameplay distance. The drops at each end and floor-level route model gravity.
+            drawTubePath(vc, pose, lanRoute, 0.036, 0xFF0B1116, 0xFF36A8D8, packedLight, packedOverlay);
+            drawConnector(vc, pose, lanPort, new Vec3(0, 0, 1), false, packedLight, packedOverlay);
+            drawConnector(vc, pose, routerPortPos, new Vec3(0, 0, 1), false, packedLight, packedOverlay);
         }
 
         int portIndex = 0;

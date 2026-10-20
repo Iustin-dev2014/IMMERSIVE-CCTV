@@ -23,6 +23,9 @@ import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import ro.immersivecctv.LinkingManager;
 import ro.immersivecctv.blockentity.XvrBlockEntity;
+import ro.immersivecctv.blockentity.MonitorBlockEntity;
+import ro.immersivecctv.blockentity.CameraBlockEntity;
+import ro.immersivecctv.blockentity.RouterBlockEntity;
 
 public class XvrBlock extends Block implements EntityBlock {
     public static final BooleanProperty POWERED = BooleanProperty.create("powered");
@@ -65,6 +68,30 @@ public class XvrBlock extends Block implements EntityBlock {
     }
 
     @Override
+    public void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean isMoving) {
+        if (!state.is(newState.getBlock()) && !level.isClientSide
+                && level.getBlockEntity(pos) instanceof XvrBlockEntity xvr) {
+            BlockPos monitorPos = xvr.getMonitorPos();
+            if (monitorPos != null && level.getBlockEntity(monitorPos) instanceof MonitorBlockEntity monitor
+                    && pos.equals(monitor.getXvrPos())) {
+                monitor.setXvrPos(null);
+            }
+            for (BlockPos cameraPos : xvr.getCameras()) {
+                if (level.getBlockEntity(cameraPos) instanceof CameraBlockEntity camera
+                        && pos.equals(camera.getXvrPos())) {
+                    camera.setXvrPos(null);
+                }
+            }
+            if (xvr.getRouterPos() != null && level.getBlockEntity(xvr.getRouterPos()) instanceof RouterBlockEntity router
+                    && router.getLanXvr(xvr.getRouterLanPort()) != null
+                    && pos.equals(router.getLanXvr(xvr.getRouterLanPort()))) {
+                router.disconnectXvr(xvr.getRouterLanPort());
+            }
+        }
+        super.onRemove(state, level, pos, newState, isMoving);
+    }
+
+    @Override
     public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hit) {
         if (hand != InteractionHand.MAIN_HAND) return InteractionResult.PASS;
         if (!player.getItemInHand(hand).isEmpty()) return InteractionResult.PASS;
@@ -72,15 +99,10 @@ public class XvrBlock extends Block implements EntityBlock {
             if (!level.isClientSide) LinkingManager.disconnectAll(player, level, pos);
             return InteractionResult.sidedSuccess(level.isClientSide);
         }
+        // Endpoint and device diagnostics are intentionally restricted to the CCTV Service Tool.
+        // A bare-hand click on the chassis must not reveal the XVR IP/port.
         if (!LinkingManager.isPowerButton(pos, hit.getDirection(), hit.getLocation())) {
-            if (!level.isClientSide && level.getBlockEntity(pos) instanceof XvrBlockEntity xvr) {
-                player.displayClientMessage(net.minecraft.network.chat.Component.literal("[XVR] Cloud IP: " + xvr.getCloudIp()), false);
-                player.displayClientMessage(net.minecraft.network.chat.Component.literal("[XVR] Cloud Port: " + xvr.getCloudPort()), false);
-                player.displayClientMessage(net.minecraft.network.chat.Component.literal(xvr.canObtainCloudEndpoint()
-                        ? "[XVR] Cloud route online (simulated in-world network)."
-                        : "[XVR] Host unreachable. Check XVR power, router WAN, router power and fibre uplink."), false);
-            }
-            return InteractionResult.sidedSuccess(level.isClientSide);
+            return InteractionResult.PASS;
         }
         if (!level.isClientSide) {
             boolean powered = state.getValue(POWERED);

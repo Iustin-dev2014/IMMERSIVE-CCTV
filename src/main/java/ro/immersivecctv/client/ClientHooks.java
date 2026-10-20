@@ -2,6 +2,8 @@ package ro.immersivecctv.client;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
+import java.util.List;
+import ro.immersivecctv.CctvNetwork;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderGuiOverlayEvent;
 import net.minecraftforge.event.TickEvent;
@@ -17,15 +19,30 @@ public final class ClientHooks {
         Minecraft.getInstance().setScreen(new XvrScreen(pos));
     }
 
-    public static void openCloudRemoteLogin(BlockPos xvrPos) {
-        Minecraft.getInstance().setScreen(new CloudRemoteLoginScreen(xvrPos));
+    public static void openCloudRemoteLogin() {
+        Minecraft.getInstance().setScreen(new CloudRemoteLoginScreen());
+    }
+
+    /** Backward-compatible call site for older item code. */
+    public static void openCloudRemoteLogin(BlockPos ignoredXvrPos) {
+        openCloudRemoteLogin();
     }
 
     public static void onCloudLoginResult(boolean success, BlockPos xvrPos, String message) {
         if (Minecraft.getInstance().screen instanceof CloudRemoteLoginScreen screen) {
-            screen.showResult(success, message);
+            screen.showResult(success, xvrPos, message);
         } else if (!success && Minecraft.getInstance().player != null) {
             Minecraft.getInstance().player.displayClientMessage(net.minecraft.network.chat.Component.literal("[CLOUD] " + message), false);
+        }
+    }
+
+    public static void onCloudScanResult(List<CctvNetwork.ScanEntry> entries) {
+        if (Minecraft.getInstance().screen instanceof CloudRemoteLoginScreen screen) {
+            screen.showScanResults(entries);
+        } else if (Minecraft.getInstance().player != null) {
+            Minecraft.getInstance().player.displayClientMessage(
+                    net.minecraft.network.chat.Component.literal("[CLOUD] Scan complete: " + entries.size() + " XVR(s) found within 100 blocks."),
+                    false);
         }
     }
 

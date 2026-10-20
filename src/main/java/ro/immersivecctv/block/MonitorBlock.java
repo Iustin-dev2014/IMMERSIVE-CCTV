@@ -36,6 +36,21 @@ public class MonitorBlock extends Block implements EntityBlock {
     @Override
     public BlockEntity newBlockEntity(BlockPos pos, BlockState state) { return new MonitorBlockEntity(pos, state); }
 
+    @Override
+    public void onRemove(net.minecraft.world.level.block.state.BlockState state, Level level, BlockPos pos,
+            net.minecraft.world.level.block.state.BlockState newState, boolean isMoving) {
+        if (!state.is(newState.getBlock()) && !level.isClientSide
+                && level.getBlockEntity(pos) instanceof MonitorBlockEntity monitor) {
+            BlockPos xvrPos = monitor.getXvrPos();
+            if (xvrPos != null && level.getBlockEntity(xvrPos) instanceof XvrBlockEntity xvr
+                    && pos.equals(xvr.getMonitorPos())) {
+                xvr.setMonitorPos(null);
+            }
+            monitor.setXvrPos(null);
+        }
+        super.onRemove(state, level, pos, newState, isMoving);
+    }
+
     private boolean hasPhysicalHdmi(Level level, BlockPos pos) {
         if (!(level.getBlockEntity(pos) instanceof MonitorBlockEntity monitor) || monitor.getXvrPos() == null) return false;
         return level.getBlockEntity(monitor.getXvrPos()) instanceof XvrBlockEntity xvr
