@@ -1,7 +1,6 @@
-             WARNING:
-The version mentioned in this file refers to a later version of the mod, which is not yet available for download! Please do not report that this file describes a version that does not exist, as you have been warned above!
+# IMMERSIVE CCTV — v1.4.5
 
-# IMMERSIVE CCTV — v1.4.0-beta.4 (development candidate)
+**Release target:** v1.4.5 (build and in-game validation required before calling it a verified release)
 
 **Author:** Iustin Martac  
 **Minecraft:** Java Edition 1.20.1  
@@ -31,7 +30,7 @@ IMMERSIVE CCTV adds a physical-feeling CCTV installation to Minecraft: an XVR re
 1. Install **Minecraft Java Edition 1.20.1**.
 2. Install a compatible **Minecraft Forge 1.20.1 / 47.x** profile.
 3. Launch once to create the game directory, then close Minecraft.
-4. Copy the compiled `immersivecctv-1.4.0.jar` to the `.minecraft/mods` folder.
+4. Copy the compiled `immersivecctv-1.4.5.jar` to the `.minecraft/mods` folder.
 5. Start Minecraft with the Forge profile.
 
 For development, use **JDK 17**. The build uses ForgeGradle 6 and Forge `1.20.1-47.2.0`.
