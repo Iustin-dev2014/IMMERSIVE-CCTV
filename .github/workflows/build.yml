@@ -1,21 +1,26 @@
-name: Build IMMERSIVE CCTV (Forge 1.20.1)
+name: IMMERSIVE CCTV — Build JAR
 
 on:
   workflow_dispatch:
   push:
-    branches: [main, master]
+    branches: [main]
   pull_request:
+    branches: [main]
 
 permissions:
   contents: read
 
+concurrency:
+  group: immersive-cctv-build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
-    name: Compile mod
+    name: Generate assets, validate and compile Forge mod
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - name: Checkout source
+      - name: Checkout main source
         uses: actions/checkout@v4
 
       - name: Set up Java 17
@@ -23,8 +28,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+          cache: gradle
 
-      - name: Set up Python
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -32,24 +38,32 @@ jobs:
       - name: Install asset-generation tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg
+          sudo apt-get install -y ffmpeg unzip
 
       - name: Install Gradle 8.8
         shell: bash
         run: |
           set -euo pipefail
-          curl -fsSL https://services.gradle.org/distributions/gradle-8.8-bin.zip -o "$RUNNER_TEMP/gradle.zip"
+          curl --retry 3 --retry-all-errors -fsSL https://services.gradle.org/distributions/gradle-8.8-bin.zip -o "$RUNNER_TEMP/gradle.zip"
           unzip -q "$RUNNER_TEMP/gradle.zip" -d "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/gradle-8.8/bin" >> "$GITHUB_PATH"
 
-      - name: Generate required assets
+      - name: Confirm release version
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F "version = '1.4.5'" build.gradle
+          echo "## IMMERSIVE CCTV v1.4.5" >> "$GITHUB_STEP_SUMMARY"
+          echo "Minecraft Forge 1.20.1 / Java 17" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Generate required textures and sounds
         shell: bash
         run: |
           set -euo pipefail
           python scripts/generate_textures.py
           python scripts/generate_sounds.py
 
-      - name: Validate source and resources
+      - name: Validate source and generated resources
         shell: bash
         run: |
           set -euo pipefail
@@ -59,14 +73,42 @@ jobs:
           test -d src/main/resources
           python scripts/validate_resources.py
 
-      - name: Build mod
-        run: gradle build --no-daemon
+      - name: Compile and package mod JAR
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle clean build --no-daemon --stacktrace
 
-      - name: Upload mod JAR
+      - name: Verify packaged JAR
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          jars=(build/libs/*.jar)
+          if [ "${#jars[@]}" -eq 0 ]; then
+            echo "Gradle completed without producing a mod JAR." >&2
+            exit 1
+          fi
+          jar_file=""
+          for candidate in "${jars[@]}"; do
+            if [[ "$candidate" != *"-sources.jar" && "$candidate" != *"-javadoc.jar" ]]; then
+              jar_file="$candidate"
+              break
+            fi
+          done
+          test -n "$jar_file"
+          jar tf "$jar_file" | grep -q '^META-INF/mods.toml$'
+          jar tf "$jar_file" | grep -q '^assets/immersivecctv/'
+          echo "Verified output: $jar_file"
+          ls -lh "$jar_file"
+          echo "### JAR verification" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Output: `$jar_file`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Size: $(du -h "$jar_file" | cut -f1)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload v1.4.5 mod JAR
         uses: actions/upload-artifact@v4
-        if: success()
         with:
-          name: immersive-cctv-build
+          name: immersive-cctv-v1.4.5
           path: build/libs/*.jar
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30
