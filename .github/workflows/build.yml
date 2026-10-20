@@ -24,6 +24,16 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install asset-generation tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
       - name: Install Gradle 8.8
         shell: bash
         run: |
@@ -31,6 +41,13 @@ jobs:
           curl -fsSL https://services.gradle.org/distributions/gradle-8.8-bin.zip -o "$RUNNER_TEMP/gradle.zip"
           unzip -q "$RUNNER_TEMP/gradle.zip" -d "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/gradle-8.8/bin" >> "$GITHUB_PATH"
+
+      - name: Generate required assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/generate_textures.py
+          python scripts/generate_sounds.py
 
       - name: Validate source and resources
         shell: bash
