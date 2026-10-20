@@ -1875,6 +1875,14 @@ jobs:
           print(f"Restored {len(members)} embedded archive entries to {source}")
           PYTHON
 
+      - name: Temporary source snapshot for targeted fixes
+        uses: actions/upload-artifact@v4
+        with:
+          name: immersivecctv-source-snapshot
+          path: project/ImmersiveCCTV-1.4.0/
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Generate textures and sound assets
         working-directory: project/ImmersiveCCTV-1.4.0
         run: |
