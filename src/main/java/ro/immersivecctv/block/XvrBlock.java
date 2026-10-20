@@ -94,15 +94,9 @@ public class XvrBlock extends Block implements EntityBlock {
             if (!level.isClientSide) LinkingManager.disconnectAll(player, level, pos);
             return InteractionResult.sidedSuccess(level.isClientSide);
         }
+        // Endpoint diagnostics are private to the CCTV Service Tool; chassis clicks do not reveal IP/port.
         if (!LinkingManager.isPowerButton(pos, hit.getDirection(), hit.getLocation())) {
-            if (!level.isClientSide && level.getBlockEntity(pos) instanceof XvrBlockEntity xvr) {
-                player.displayClientMessage(net.minecraft.network.chat.Component.literal("[XVR] Cloud IP: " + xvr.getCloudIp()), false);
-                player.displayClientMessage(net.minecraft.network.chat.Component.literal("[XVR] Cloud Port: " + xvr.getCloudPort()), false);
-                player.displayClientMessage(net.minecraft.network.chat.Component.literal(xvr.canObtainCloudEndpoint()
-                        ? "[XVR] Cloud route online (simulated in-world network)."
-                        : "[XVR] Host unreachable. Check XVR power, router WAN, router power and fibre uplink."), false);
-            }
-            return InteractionResult.sidedSuccess(level.isClientSide);
+            return InteractionResult.PASS;
         }
         if (!level.isClientSide) {
             boolean powered = state.getValue(POWERED);
