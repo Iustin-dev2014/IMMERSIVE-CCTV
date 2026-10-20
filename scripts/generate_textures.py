@@ -120,18 +120,19 @@ def make_front(on):
 make_front(True).save(BLOCK/'xvr_front_on.png')
 make_front(False).save(BLOCK/'xvr_front_off.png')
 
-# Four independent front-panel status LEDs: HDD/red, WAN/blue, power/green, PoE/yellow.
-# These textures are selected by live BlockState properties, rather than a decorative always-on label.
+# Preserve the original round red/blue/green status lamps. The newer rectangular
+# overlays duplicated those indicators, so only add one round amber lamp beside them.
 def make_front_status(powered, poe_link, wan_link):
     c = make_front(powered)
-    active = [(235,55,55,255) if powered else (66,26,27,255),
-              (69,166,255,255) if wan_link else (23,44,61,255),
-              (76,241,129,255) if powered else (24,52,34,255),
-              (255,202,60,255) if poe_link else (60,47,22,255)]
-    for i, color in enumerate(active):
-        x = 35 + i * 7
-        c.rect(x, 2, x + 3, 5, color)
-        c.rect(x, 2, x + 3, 2, tuple(min(255, int(ch * 1.2)) for ch in color[:3]) + (255,))
+    # Circular amber PoE/activity indicator, drawn as a ring and a bright core.
+    cx, cy = 57, 4
+    for y in range(0, 9):
+        for x in range(53, 62):
+            d2 = (x - cx) ** 2 + (y - cy) ** 2
+            if 5 <= d2 <= 10:
+                c.rect(x, y, x + 1, y + 1, (105, 75, 18, 255) if not poe_link else (255, 180, 35, 255))
+            elif d2 <= 4:
+                c.rect(x, y, x + 1, y + 1, (56, 42, 18, 255) if not poe_link else (255, 224, 94, 255))
     c.noise(1)
     suffix = ('on' if powered else 'off') + '_p' + str(int(poe_link)) + '_w' + str(int(wan_link))
     c.save(BLOCK / ('xvr_front_' + suffix + '.png'))
