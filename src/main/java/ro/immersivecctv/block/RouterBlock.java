@@ -50,6 +50,16 @@ public final class RouterBlock extends Block implements EntityBlock {
 
     @Override public BlockEntity newBlockEntity(BlockPos pos, BlockState state) { return new RouterBlockEntity(pos, state); }
 
+    @Override
+    public void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean isMoving) {
+        if (!state.is(newState.getBlock()) && !level.isClientSide
+                && level.getBlockEntity(pos) instanceof RouterBlockEntity router) {
+            router.disconnectFibre();
+            for (int port = 0; port < 4; port++) router.disconnectXvr(port);
+        }
+        super.onRemove(state, level, pos, newState, isMoving);
+    }
+
     @Override public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hit) {
         if (hand != InteractionHand.MAIN_HAND || !player.getItemInHand(hand).isEmpty()) return InteractionResult.PASS;
         // The physical power button is on the front (north) edge of the router.
