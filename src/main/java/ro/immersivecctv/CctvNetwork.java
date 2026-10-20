@@ -9,6 +9,8 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.chunk.ChunkStatus;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraftforge.network.NetworkEvent;
 import net.minecraftforge.network.PacketDistributor;
@@ -37,6 +39,9 @@ public final class CctvNetwork {
         if (registered) return;
         CHANNEL.registerMessage(0, DeviceCommand.class, DeviceCommand::encode, DeviceCommand::decode, DeviceCommand::handle);
         CHANNEL.registerMessage(1, CloudLoginResult.class, CloudLoginResult::encode, CloudLoginResult::decode, CloudLoginResult::handle);
+        CHANNEL.registerMessage(2, CloudEndpointLoginRequest.class, CloudEndpointLoginRequest::encode, CloudEndpointLoginRequest::decode, CloudEndpointLoginRequest::handle);
+        CHANNEL.registerMessage(3, CloudScanRequest.class, CloudScanRequest::encode, CloudScanRequest::decode, CloudScanRequest::handle);
+        CHANNEL.registerMessage(4, CloudScanResult.class, CloudScanResult::encode, CloudScanResult::decode, CloudScanResult::handle);
         registered = true;
     }
 
@@ -65,6 +70,16 @@ public final class CctvNetwork {
         CHANNEL.sendToServer(new DeviceCommand(xvrPos, null, 12, "", ""));
     }
 
+    /** Connect using a user-entered endpoint; XVR resolution and all checks happen on the server. */
+    public static void sendCloudEndpointLogin(String host, String port, String username, String password) {
+        CHANNEL.sendToServer(new CloudEndpointLoginRequest(host, port, username, password));
+    }
+
+    /** Scan currently loaded XVR endpoints within the explicitly requested 100-block radius. */
+    public static void requestCloudScan() {
+        CHANNEL.sendToServer(new CloudScanRequest());
+    }
+
     private static boolean isRemoteSession(ServerPlayer player, BlockPos xvrPos) {
         RemoteSession session = REMOTE_SESSIONS.get(player.getUUID());
         return session != null && session.xvrPos().equals(xvrPos)
@@ -86,6 +101,134 @@ public final class CctvNetwork {
         BlockEntity monitorEntity = level.getBlockEntity(xvr.getMonitorPos());
         return monitorEntity instanceof MonitorBlockEntity monitor
                 && xvrPos.equals(monitor.getXvrPos()) && monitor.hasWorkingPower();
+    }
+
+
+    private static List<XvrBlockEntity> nearbyXvrs(ServerPlayer player) {
+        ServerLevel level = player.serverLevel();
+        BlockPos center = player.blockPosition();
+        int minChunkX = Math.floorDiv(center.getX() - 100, 16);
+        int maxChunkX = Math.floorDiv(center.getX() + 100, 16);
+        int minChunkZ = Math.floorDiv(center.getZ() - 100, 16);
+        int maxChunkZ = Math.floorDiv(center.getZ() + 100, 16);
+        List<XvrBlockEntity> found = new java.util.ArrayList<>();
+        java.util.Set<BlockPos> seen = new java.util.HashSet<>();
+        for (int cx = minChunkX; cx <= maxChunkX; cx++) {
+            for (int cz = minChunkZ; cz <= maxChunkZ; cz++) {
+                var chunk = level.getChunkSource().getChunk(cx, cz, ChunkStatus.FULL, false);
+                if (chunk == null) continue; // Never force-load terrain merely to scan a remote.
+                for (BlockEntity be : chunk.getBlockEntities().values()) {
+                    if (!(be instanceof XvrBlockEntity xvr) || !seen.add(xvr.getBlockPos())) continue;
+                    if (xvr.getBlockPos().distToCenterSqr(player.getX(), player.getY(), player.getZ()) <= 100.0D * 100.0D) {
+                        found.add(xvr);
+                    }
+                }
+            }
+        }
+        found.sort(java.util.Comparator.comparingDouble(x -> x.getBlockPos().distToCenterSqr(
+                player.getX(), player.getY(), player.getZ())));
+        return found;
+    }
+
+    private static XvrBlockEntity findEndpoint(ServerPlayer player, String host, String port) {
+        for (XvrBlockEntity xvr : nearbyXvrs(player)) {
+            if (xvr.matchesConfiguredEndpoint(host, port)) return xvr;
+        }
+        return null;
+    }
+
+    private static void handleCloudEndpointLogin(ServerPlayer player, String host, String port, String username, String password) {
+        XvrBlockEntity xvr = findEndpoint(player, host, port);
+        if (xvr == null) {
+            sendCloudLoginResult(player, false, BlockPos.ZERO, "HOST UNREACHABLE");
+            return;
+        }
+        BlockPos pos = xvr.getBlockPos();
+        if (!xvr.canObtainCloudEndpoint()) {
+            sendCloudLoginResult(player, false, pos, "HOST UNREACHABLE — the XVR must be powered and the router/WAN/fibre route must be online.");
+            return;
+        }
+        if (!xvr.isAccountConfigured()) {
+            sendCloudLoginResult(player, false, pos, "XVR account is not configured. Open the local monitor once to create the administrator account.");
+            return;
+        }
+        if (!xvr.authenticateAccount(username, password)) {
+            sendCloudLoginResult(player, false, pos, "Login failed: incorrect XVR username or password.");
+            return;
+        }
+        REMOTE_SESSIONS.put(player.getUUID(), new RemoteSession(player.serverLevel().dimension().location(), pos.immutable()));
+        sendCloudLoginResult(player, true, pos, "Cloud session authenticated.");
+    }
+
+    private record CloudEndpointLoginRequest(String host, String port, String username, String password) {
+        private static void encode(CloudEndpointLoginRequest msg, FriendlyByteBuf buf) {
+            buf.writeUtf(msg.host == null ? "" : msg.host.trim(), 64);
+            buf.writeUtf(msg.port == null ? "" : msg.port.trim(), 8);
+            buf.writeUtf(msg.username == null ? "" : msg.username.trim(), 64);
+            buf.writeUtf(msg.password == null ? "" : msg.password, 128);
+        }
+        private static CloudEndpointLoginRequest decode(FriendlyByteBuf buf) {
+            return new CloudEndpointLoginRequest(buf.readUtf(64), buf.readUtf(8), buf.readUtf(64), buf.readUtf(128));
+        }
+        private static void handle(CloudEndpointLoginRequest msg, Supplier<NetworkEvent.Context> contextSupplier) {
+            NetworkEvent.Context ctx = contextSupplier.get();
+            ctx.enqueueWork(() -> {
+                ServerPlayer player = ctx.getSender();
+                if (player != null) handleCloudEndpointLogin(player, msg.host, msg.port, msg.username, msg.password);
+            });
+            ctx.setPacketHandled(true);
+        }
+    }
+
+    private record CloudScanRequest() {
+        private static void encode(CloudScanRequest msg, FriendlyByteBuf buf) { }
+        private static CloudScanRequest decode(FriendlyByteBuf buf) { return new CloudScanRequest(); }
+        private static void handle(CloudScanRequest msg, Supplier<NetworkEvent.Context> contextSupplier) {
+            NetworkEvent.Context ctx = contextSupplier.get();
+            ctx.enqueueWork(() -> {
+                ServerPlayer player = ctx.getSender();
+                if (player == null) return;
+                List<EndpointEntry> entries = new java.util.ArrayList<>();
+                for (XvrBlockEntity xvr : nearbyXvrs(player)) {
+                    boolean reachable = xvr.canObtainCloudEndpoint();
+                    entries.add(new EndpointEntry(xvr.getBlockPos(), xvr.getConfiguredCloudIp(),
+                            xvr.getConfiguredCloudPort(), reachable));
+                    if (entries.size() >= 64) break;
+                }
+                CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new CloudScanResult(entries));
+            });
+            ctx.setPacketHandled(true);
+        }
+    }
+
+    private record EndpointEntry(BlockPos pos, String host, String port, boolean reachable) { }
+
+    private record CloudScanResult(List<EndpointEntry> entries) {
+        private static void encode(CloudScanResult msg, FriendlyByteBuf buf) {
+            int count = Math.min(64, msg.entries == null ? 0 : msg.entries.size());
+            buf.writeVarInt(count);
+            for (int i = 0; i < count; i++) {
+                EndpointEntry entry = msg.entries.get(i);
+                buf.writeBlockPos(entry.pos());
+                buf.writeUtf(entry.host(), 64);
+                buf.writeUtf(entry.port(), 8);
+                buf.writeBoolean(entry.reachable());
+            }
+        }
+        private static CloudScanResult decode(FriendlyByteBuf buf) {
+            int count = Math.max(0, Math.min(64, buf.readVarInt()));
+            List<EndpointEntry> entries = new java.util.ArrayList<>(count);
+            for (int i = 0; i < count; i++) {
+                entries.add(new EndpointEntry(buf.readBlockPos(), buf.readUtf(64), buf.readUtf(8), buf.readBoolean()));
+            }
+            return new CloudScanResult(entries);
+        }
+        private static void handle(CloudScanResult msg, Supplier<NetworkEvent.Context> contextSupplier) {
+            NetworkEvent.Context ctx = contextSupplier.get();
+            ctx.enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
+                    () -> () -> ro.immersivecctv.client.ClientHooks.onCloudScanResult(msg.entries)));
+            ctx.setPacketHandled(true);
+        }
     }
 
     private record DeviceCommand(BlockPos xvrPos, BlockPos cameraPos, int action, String username, String password) {
