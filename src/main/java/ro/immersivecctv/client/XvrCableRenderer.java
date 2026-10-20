@@ -68,7 +68,7 @@ public class XvrCableRenderer implements BlockEntityRenderer<XvrBlockEntity> {
                     target.getZ() - be.getBlockPos().getZ() + 0.44);
             Vec3 endDrop = new Vec3(end.x, 0.035, end.z + 0.11);
             List<Vec3> points = floorRoute(sourcePort, sourceDrop, endDrop, end, true);
-            drawTubePath(vc, pose, points, 0.033, 0xFF111519, 0xFF30383E, packedLight, packedOverlay);
+            drawTubePath(vc, pose, points, 0.042, 0xFF111519, 0xFF30383E, packedLight, packedOverlay);
             Vec3 outward = new Vec3(0, 0, 1);
             drawConnector(vc, pose, sourcePort, outward, true, packedLight, packedOverlay);
             drawConnector(vc, pose, end, outward, true, packedLight, packedOverlay);
@@ -80,7 +80,7 @@ public class XvrCableRenderer implements BlockEntityRenderer<XvrBlockEntity> {
                 Vec3 monitorPowerDrop = new Vec3(monitorPower.x, 0.035, monitorPower.z + 0.08);
                 Vec3 wallDrop = new Vec3(wallPort.position().x, 0.035, wallPort.position().z);
                 List<Vec3> powerRoute = floorRoute(monitorPower, monitorPowerDrop, wallDrop, wallPort.position(), false);
-                drawTubePath(vc, pose, powerRoute, 0.022, 0xFF111416, 0xFFB99843, packedLight, packedOverlay);
+                drawTubePath(vc, pose, powerRoute, 0.030, 0xFF111416, 0xFFB99843, packedLight, packedOverlay);
                 drawPowerPlug(vc, pose, monitorPower, new Vec3(0, 0, 1), packedLight, packedOverlay);
                 drawPowerPlug(vc, pose, wallPort.position(), wallPort.outward(), packedLight, packedOverlay);
             }
@@ -93,7 +93,7 @@ public class XvrCableRenderer implements BlockEntityRenderer<XvrBlockEntity> {
             Vec3 xvrPowerDrop = new Vec3(xvrPower.x, 0.035, xvrPower.z + 0.07);
             Vec3 wallDrop = new Vec3(wallPort.position().x, 0.035, wallPort.position().z);
             List<Vec3> powerRoute = floorRoute(xvrPower, xvrPowerDrop, wallDrop, wallPort.position(), false);
-            drawTubePath(vc, pose, powerRoute, 0.024, 0xFF101315, 0xFFC5A24D, packedLight, packedOverlay);
+            drawTubePath(vc, pose, powerRoute, 0.032, 0xFF101315, 0xFFC5A24D, packedLight, packedOverlay);
             drawPowerPlug(vc, pose, xvrPower, new Vec3(0, 0, 1), packedLight, packedOverlay);
             drawPowerPlug(vc, pose, wallPort.position(), wallPort.outward(), packedLight, packedOverlay);
         }
@@ -110,7 +110,7 @@ public class XvrCableRenderer implements BlockEntityRenderer<XvrBlockEntity> {
             Vec3 rearDirection = new Vec3(-facing.getStepX(), 0, -facing.getStepZ());
             Vec3 endDrop = new Vec3(end.x + rearDirection.x * 0.11, 0.035, end.z + rearDirection.z * 0.11);
             List<Vec3> points = floorRoute(sourcePort, sourceDrop, endDrop, end, false);
-            drawTubePath(vc, pose, points, 0.028, 0xFF07558E, 0xFF3298D8, packedLight, packedOverlay);
+            drawTubePath(vc, pose, points, 0.036, 0xFF07558E, 0xFF3298D8, packedLight, packedOverlay);
             drawConnector(vc, pose, sourcePort, new Vec3(0, 0, -1), false, packedLight, packedOverlay);
             drawConnector(vc, pose, end, rearDirection, false, packedLight, packedOverlay);
             portIndex++;
