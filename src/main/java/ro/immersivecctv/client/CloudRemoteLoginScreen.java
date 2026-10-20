@@ -71,7 +71,28 @@ public final class CloudRemoteLoginScreen extends Screen {
         addRenderableWidget(Button.builder(Component.literal("CANCEL"), b -> onClose())
                 .bounds(width / 2 - 78, top + 146, 156, 18).build());
 
-        // Scan is deliberately at the bottom of the panel, separate from manual connection.
+        // Results are selectable buttons, with SCAN kept at the bottom of the panel.
+        int listY = Math.max(top + 168, height / 2 + 64);
+        int shownCount = Math.min(scanResults.size(), Math.max(0, (height - listY - 54) / 20));
+        for (int i = 0; i < shownCount; i++) {
+            final BlockPos candidatePos = scanResults.get(i).immutable();
+            XvrBlockEntity candidate = xvrAt(candidatePos);
+            if (candidate == null) continue;
+            String label = candidate.getCloudIp() + ":" + candidate.getCloudPort()
+                    + " @ " + candidatePos.getX() + "," + candidatePos.getY() + "," + candidatePos.getZ();
+            Button select = Button.builder(Component.literal(label), b -> {
+                selectedXvrPos = candidatePos;
+                XvrBlockEntity chosen = xvrAt(candidatePos);
+                if (chosen != null) {
+                    hostField.setValue(chosen.getCloudIp());
+                    portField.setValue(chosen.getCloudPort());
+                    status = "Selected powered XVR. Enter credentials and connect.";
+                }
+                rebuildWidgets();
+            }).bounds(Math.max(4, width / 2 - 145), listY + i * 20, Math.min(290, width - 8), 18).build();
+            select.active = !candidatePos.equals(selectedXvrPos);
+            addRenderableWidget(select);
+        }
         addRenderableWidget(Button.builder(Component.literal("SCAN"), b -> scanNearby())
                 .bounds(width / 2 - 78, height - 30, 156, 18).build());
         setInitialFocus(hostField);
@@ -220,16 +241,6 @@ public final class CloudRemoteLoginScreen extends Screen {
         while (font.width(shown) > maxWidth && shown.length() > 5) shown = shown.substring(0, shown.length() - 4) + "...";
         g.drawCenteredString(font, shown, width / 2, height - 43, status.toUpperCase(java.util.Locale.ROOT).contains("UNREACHABLE") ? 0xFFFF5555 : 0xFFFFD778);
 
-        int listY = Math.max(180, height / 2 + 64);
-        int shownCount = Math.min(scanResults.size(), Math.max(0, (height - listY - 56) / 16));
-        for (int i = 0; i < shownCount; i++) {
-            BlockPos pos = scanResults.get(i);
-            XvrBlockEntity xvr = xvrAt(pos);
-            if (xvr == null) continue;
-            int y = listY + i * 16;
-            int color = pos.equals(selectedXvrPos) ? 0xFF71F4E2 : 0xFFE0E8EB;
-            g.drawCenteredString(font, (pos.equals(selectedXvrPos) ? "> " : "  ") + xvr.getCloudIp() + ":" + xvr.getCloudPort()
-                    + "  [" + pos.getX() + ", " + pos.getY() + ", " + pos.getZ() + "]", width / 2, y, color);
-        }
+
     }
 }
