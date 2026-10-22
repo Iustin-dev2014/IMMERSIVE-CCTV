@@ -49,11 +49,24 @@ jobs:
           VM_WEB_PASSWORD: ${{ secrets.VM_WEB_PASSWORD }}
         run: |
           set -euo pipefail
+
           TTYD_BIN="$(command -v ttyd)"
           CLOUDFLARED="$RUNNER_TEMP/vmtest/cloudflared"
 
+          # Pick a free local port instead of assuming 7681 is always available.
+          TTYD_PORT="$(python3 - <<'PY'
+          import socket
+          s = socket.socket()
+          s.bind(("127.0.0.1", 0))
+          print(s.getsockname()[1])
+          s.close()
+          PY
+          )"
+
+          echo "Using local ttyd port: ${TTYD_PORT}"
+
           # Start a clean interactive shell without forcing a minimal environment.
-          "$TTYD_BIN" --interface 127.0.0.1 --port 7681 \
+          "$TTYD_BIN" --interface 127.0.0.1 --port "$TTYD_PORT" \
             --credential "cctvtest:${VM_WEB_PASSWORD}" --writable \
             bash --noprofile --norc -i \
             > "$RUNNER_TEMP/vmtest/ttyd.log" 2>&1 &
@@ -64,8 +77,10 @@ jobs:
               kill "$TUNNEL_PID" 2>/dev/null || true
               wait "$TUNNEL_PID" 2>/dev/null || true
             fi
-            kill "$TTYD_PID" 2>/dev/null || true
-            wait "$TTYD_PID" 2>/dev/null || true
+            if [[ -n "${TTYD_PID:-}" ]]; then
+              kill "$TTYD_PID" 2>/dev/null || true
+              wait "$TTYD_PID" 2>/dev/null || true
+            fi
           }
           TUNNEL_PID=""
           trap cleanup EXIT
@@ -74,10 +89,10 @@ jobs:
           for tunnel_attempt in $(seq 1 5); do
             echo "Starting Cloudflare Quick Tunnel (attempt ${tunnel_attempt}/5)..."
             : > "$RUNNER_TEMP/vmtest/cloudflared.log"
-            "$CLOUDFLARED" tunnel --url http://127.0.0.1:7681 --no-autoupdate > "$RUNNER_TEMP/vmtest/cloudflared.log" 2>&1 &
+            "$CLOUDFLARED" tunnel --url "http://127.0.0.1:${TTYD_PORT}" --no-autoupdate > "$RUNNER_TEMP/vmtest/cloudflared.log" 2>&1 &
             TUNNEL_PID=$!
 
-            for wait_attempt in $(seq 1 20); do
+            for wait_attempt in $(seq 1 25); do
               if ! kill -0 "$TTYD_PID" 2>/dev/null; then
                 echo "::error::The browser terminal stopped unexpectedly."
                 cat "$RUNNER_TEMP/vmtest/ttyd.log"
