@@ -20,6 +20,8 @@
     .small{font-size:12px;color:#8fa2bd}
     .ok{color:#68e6a8}.err{color:#ff9292}.code{font-size:28px;letter-spacing:.12em;font-weight:900;color:#fff}
     .panel{margin-top:16px;padding:14px;border-radius:12px;background:#080f1b;overflow-wrap:anywhere}
+    .fallback{margin-top:16px;padding:16px;border:1px solid #ff929266;border-radius:12px;background:#321a20;text-align:left}
+    .marker{padding:12px;margin:10px 0;border-radius:8px;background:#080f1b;overflow-wrap:anywhere;font-family:ui-monospace,monospace;user-select:all}
     a{color:#9bc7ff}
   </style>
 </head>
@@ -36,6 +38,14 @@
       <p class="small">După ce aprobi accesul, revino aici. Pagina verifică automat autorizarea.</p>
     </div>
     <div id="status" class="status" role="status" aria-live="polite"></div>
+    <section id="fallback" class="fallback" hidden>
+      <strong>Autentificarea automată nu este disponibilă în acest browser.</strong>
+      <p>Browserul a blocat solicitarea directă către GitHub (de obicei o limitare CORS). Poți confirma în siguranță prin comentariul de sesiune de mai jos.</p>
+      <div id="marker" class="marker"></div>
+      <button id="copy" type="button">COPIAZĂ CODUL DE CONFIRMARE</button>
+      <a id="issue-link" class="link secondary" href="#" target="_blank" rel="noopener noreferrer">Deschide sesiunea GitHub</a>
+      <p class="small">În pagina GitHub, adaugă codul copiat ca un comentariu și trimite-l. Workflow-ul acceptă confirmarea doar de la contul Iustin-dev2014.</p>
+    </section>
     <p class="small">Fluxul folosește GitHub OAuth Device Flow și GitHub Actions. Tokenul nu este salvat în local storage și este eliminat din memorie după confirmare. GitHub poate cere autorizare pentru acces la repository-uri publice.</p>
   </main>
   <script>
@@ -54,6 +64,21 @@
       const auth = document.getElementById("auth");
       const userCode = document.getElementById("user-code");
       const intro = document.getElementById("intro");
+      const fallback = document.getElementById("fallback");
+      const marker = document.getElementById("marker");
+      const copyButton = document.getElementById("copy");
+      const issueLink = document.getElementById("issue-link");
+      const confirmationMarker = "CCTV_TEST_CONFIRM:" + nonce;
+      issueLink.href = "https://github.com/" + OWNER + "/" + REPO + "/issues/" + issue;
+      marker.textContent = confirmationMarker;
+      copyButton.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(confirmationMarker);
+          say("Codul a fost copiat. Deschide sesiunea GitHub și lipește-l într-un comentariu.", "ok");
+        } catch {
+          say("Selectează codul afișat și copiază-l manual, apoi lipește-l într-un comentariu GitHub.", "err");
+        }
+      });
       let accessToken = "";
       let stopped = false;
 
@@ -144,7 +169,9 @@
           try { window.close(); } catch {}
         } catch (error) {
           accessToken = "";
-          say(error && error.message ? error.message : "A apărut o eroare. Încearcă din nou.", "err");
+          const message = error && error.message ? error.message : "A apărut o eroare. Încearcă din nou.";
+          say(message + (message.toLowerCase().includes("fetch") ? " Am activat metoda de rezervă de mai jos." : ""), "err");
+          fallback.hidden = false;
           button.disabled = false;
           button.textContent = "REÎNCEARCĂ AUTENTIFICAREA";
         }
