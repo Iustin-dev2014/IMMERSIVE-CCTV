@@ -14,7 +14,7 @@ jobs:
   browser-vm:
     name: Start temporary browser terminal
     runs-on: ubuntu-24.04
-    timeout-minutes: 7
+    timeout-minutes: 10
     steps:
       - name: Check required password secret
         shell: bash
@@ -110,29 +110,66 @@ jobs:
             bash --noprofile --norc > "$RUNNER_TEMP/vmtest/ttyd.log" 2>&1 &
           TTYD_PID=$!
 
-          "$CLOUDFLARED" tunnel --url http://127.0.0.1:7681 --no-autoupdate > "$RUNNER_TEMP/vmtest/cloudflared.log" 2>&1 &
-          TUNNEL_PID=$!
-
           cleanup() {
-            kill "$TUNNEL_PID" "$TTYD_PID" 2>/dev/null || true
-            wait "$TUNNEL_PID" "$TTYD_PID" 2>/dev/null || true
+            if [[ -n "${TUNNEL_PID:-}" ]]; then
+              kill "$TUNNEL_PID" 2>/dev/null || true
+              wait "$TUNNEL_PID" 2>/dev/null || true
+            fi
+            kill "$TTYD_PID" 2>/dev/null || true
+            wait "$TTYD_PID" 2>/dev/null || true
           }
+          TUNNEL_PID=""
           trap cleanup EXIT
 
+          # Quick Tunnel provisioning can temporarily fail with Cloudflare 409/Tunnelstore errors.
+          # Retry with a fresh process and log file instead of failing on the first response.
           URL=""
-          for attempt in $(seq 1 60); do
-            if ! kill -0 "$TTYD_PID" 2>/dev/null; then
-              echo "::error::The browser terminal stopped unexpectedly."
-              cat "$RUNNER_TEMP/vmtest/ttyd.log"
-              exit 1
+          for tunnel_attempt in $(seq 1 5); do
+            echo "Starting Cloudflare Quick Tunnel (attempt ${tunnel_attempt}/5)..."
+            : > "$RUNNER_TEMP/vmtest/cloudflared.log"
+            "$CLOUDFLARED" tunnel --url http://127.0.0.1:7681 --no-autoupdate > "$RUNNER_TEMP/vmtest/cloudflared.log" 2>&1 &
+            TUNNEL_PID=$!
+
+            for wait_attempt in $(seq 1 20); do
+              if ! kill -0 "$TTYD_PID" 2>/dev/null; then
+                echo "::error::The browser terminal stopped unexpectedly."
+                cat "$RUNNER_TEMP/vmtest/ttyd.log"
+                exit 1
+              fi
+
+              URL="$(grep -Eo 'https://[a-zA-Z0-9.-]+\.trycloudflare\.com' "$RUNNER_TEMP/vmtest/cloudflared.log" | head -n 1 || true)"
+              if [[ -n "$URL" ]]; then
+                break
+              fi
+
+              # If cloudflared exited (for example, Tunnelstore returned HTTP 409),
+              # stop waiting and move to the next attempt.
+              if ! kill -0 "$TUNNEL_PID" 2>/dev/null; then
+                break
+              fi
+              sleep 1
+            done
+
+            if [[ -n "$URL" ]]; then
+              break
             fi
-            URL="$(grep -Eo 'https://[a-zA-Z0-9.-]+\.trycloudflare\.com' "$RUNNER_TEMP/vmtest/cloudflared.log" | head -n 1 || true)"
-            if [[ -n "$URL" ]]; then break; fi
-            sleep 1
+
+            echo "Quick Tunnel attempt ${tunnel_attempt} did not produce a URL."
+            cat "$RUNNER_TEMP/vmtest/cloudflared.log"
+            kill "$TUNNEL_PID" 2>/dev/null || true
+            wait "$TUNNEL_PID" 2>/dev/null || true
+            TUNNEL_PID=""
+
+            if [[ "$tunnel_attempt" -lt 5 ]]; then
+              delay=$((tunnel_attempt * 4))
+              echo "Retrying Cloudflare Quick Tunnel in ${delay}s..."
+              sleep "$delay"
+            fi
           done
 
           if [[ -z "$URL" ]]; then
-            echo "::error::Could not obtain a temporary tunnel URL. Cloudflared output follows:"
+            echo "::error::Could not obtain a temporary tunnel URL after 5 attempts. Cloudflare Quick Tunnel provisioning may be temporarily unavailable."
+            echo "Final Cloudflared output:"
             cat "$RUNNER_TEMP/vmtest/cloudflared.log"
             exit 1
           fi
