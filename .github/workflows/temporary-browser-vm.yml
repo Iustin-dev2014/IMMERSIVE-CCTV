@@ -1,0 +1,95 @@
+name: Temporary Browser VM (5 minutes)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: temporary-browser-vm
+  cancel-in-progress: true
+
+jobs:
+  browser-vm:
+    name: Start temporary browser terminal
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - name: Check required password secret
+        shell: bash
+        env:
+          VM_WEB_PASSWORD: ${{ secrets.VM_WEB_PASSWORD }}
+        run: |
+          if [[ -z "${VM_WEB_PASSWORD}" ]]; then
+            echo "::error::Missing repository secret VM_WEB_PASSWORD. Add it in Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - name: Download temporary web terminal and tunnel
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/vmtest"
+          curl -fsSL --retry 3 https://github.com/tsl0922/ttyd/releases/latest/download/ttyd.x86_64 -o "$RUNNER_TEMP/vmtest/ttyd"
+          curl -fsSL --retry 3 https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o "$RUNNER_TEMP/vmtest/cloudflared"
+          chmod 700 "$RUNNER_TEMP/vmtest/ttyd" "$RUNNER_TEMP/vmtest/cloudflared"
+          "$RUNNER_TEMP/vmtest/ttyd" --version
+          "$RUNNER_TEMP/vmtest/cloudflared" --version
+
+      - name: Start protected terminal and temporary public tunnel
+        shell: bash
+        env:
+          VM_WEB_PASSWORD: ${{ secrets.VM_WEB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          TTYD="$RUNNER_TEMP/vmtest/ttyd"
+          CLOUDFLARED="$RUNNER_TEMP/vmtest/cloudflared"
+
+          # The browser terminal is password-protected. Do not print the password.
+          # Start a clean shell so workflow secrets and GitHub runtime variables are not inherited.
+          "$TTYD" --interface 127.0.0.1 --port 7681 --credential "cctvtest:${VM_WEB_PASSWORD}" --writable \
+            env -i HOME="$HOME" USER="$USER" PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" TERM=xterm-256color \
+            bash --noprofile --norc > "$RUNNER_TEMP/vmtest/ttyd.log" 2>&1 &
+          TTYD_PID=$!
+
+          "$CLOUDFLARED" tunnel --url http://127.0.0.1:7681 --no-autoupdate > "$RUNNER_TEMP/vmtest/cloudflared.log" 2>&1 &
+          TUNNEL_PID=$!
+
+          cleanup() {
+            kill "$TUNNEL_PID" "$TTYD_PID" 2>/dev/null || true
+            wait "$TUNNEL_PID" "$TTYD_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          URL=""
+          for attempt in $(seq 1 60); do
+            if ! kill -0 "$TTYD_PID" 2>/dev/null; then
+              echo "::error::The browser terminal stopped unexpectedly."
+              cat "$RUNNER_TEMP/vmtest/ttyd.log"
+              exit 1
+            fi
+            URL="$(grep -Eo 'https://[a-zA-Z0-9.-]+\.trycloudflare\.com' "$RUNNER_TEMP/vmtest/cloudflared.log" | head -n 1 || true)"
+            if [[ -n "$URL" ]]; then break; fi
+            sleep 1
+          done
+
+          if [[ -z "$URL" ]]; then
+            echo "::error::Could not obtain a temporary tunnel URL."
+            cat "$RUNNER_TEMP/vmtest/cloudflared.log"
+            exit 1
+          fi
+
+          echo "=================================================="
+          echo "TEMPORARY BROWSER VM IS READY"
+          echo "Open this URL and sign in with:"
+          echo "  Username: cctvtest"
+          echo "  Password: the value you saved as VM_WEB_PASSWORD"
+          echo "$URL"
+          echo "The session will close automatically after 5 minutes."
+          echo "Do not share the URL or password."
+          echo "=================================================="
+
+          # Keep the runner alive for exactly five minutes after the tunnel is ready.
+          sleep 300
+          echo "Five minutes elapsed. Closing the temporary browser VM now."
