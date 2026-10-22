@@ -4,70 +4,152 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#101827">
-  <title>IMMERSIVE CCTV — Confirmă testul</title>
+  <title>IMMERSIVE CCTV — Confirmare securizată</title>
   <style>
     :root{color-scheme:dark;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
     *{box-sizing:border-box}
-    body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at top,#23395d,#101827 58%);color:#f4f7fb}
-    main{width:min(100%,560px);padding:clamp(24px,6vw,44px);border:1px solid #ffffff22;border-radius:24px;background:#111c2dcc;box-shadow:0 24px 80px #0005;text-align:center}
-    .logo{font-size:13px;letter-spacing:.18em;color:#9db7da;font-weight:800}
-    h1{font-size:clamp(28px,6vw,40px);margin:18px 0 12px}
+    body{margin:0;min-height:100vh;display:grid;place-items:center;padding:20px;background:radial-gradient(circle at top,#23395d,#101827 58%);color:#f4f7fb}
+    main{width:min(100%,600px);padding:clamp(22px,5vw,40px);border:1px solid #ffffff22;border-radius:24px;background:#111c2ddd;box-shadow:0 24px 80px #0005;text-align:center}
+    .logo{font-size:12px;letter-spacing:.16em;color:#9db7da;font-weight:800}
+    h1{font-size:clamp(26px,6vw,38px);margin:16px 0 12px}
     p{color:#c2cde0;line-height:1.6}
-    button,.issue-link{display:block;width:100%;margin-top:22px;padding:18px 20px;border:0;border-radius:14px;background:#42d392;color:#062417;font-weight:900;font-size:17px;text-decoration:none;cursor:pointer}
+    button,.link{display:block;width:100%;margin-top:16px;padding:16px;border:0;border-radius:13px;background:#42d392;color:#062417;font-weight:850;font-size:16px;text-decoration:none;cursor:pointer}
     button:disabled{opacity:.55;cursor:wait}
+    .secondary{background:#23395d;color:#f4f7fb}
     .status{min-height:28px;margin-top:18px;font-weight:700;overflow-wrap:anywhere}
     .small{font-size:12px;color:#8fa2bd}
-    .ok{color:#68e6a8}.err{color:#ff9292}
-    code{display:block;margin-top:12px;padding:12px;border-radius:10px;background:#080f1b;color:#f4f7fb;overflow-wrap:anywhere;user-select:all}
+    .ok{color:#68e6a8}.err{color:#ff9292}.code{font-size:28px;letter-spacing:.12em;font-weight:900;color:#fff}
+    .panel{margin-top:16px;padding:14px;border-radius:12px;background:#080f1b;overflow-wrap:anywhere}
+    a{color:#9bc7ff}
   </style>
 </head>
 <body>
   <main>
     <div class="logo">IUSTIN-DEV · IMMERSIVE CCTV</div>
     <h1>Confirmă testul</h1>
-    <p>Apasă butonul pentru a copia codul de confirmare și a deschide issue-ul temporar din GitHub. Apoi lipește codul ca un comentariu și publică-l.</p>
-    <p>Ai 5 minute. Workflow-ul detectează comentariul și se încheie automat; dacă timpul expiră, sesiunea se închide.</p>
-    <button id="confirm" type="button">✓ COPIAZĂ CODUL ȘI DESCHIDE GITHUB</button>
+    <p id="intro">Autentifică-te cu GitHub și confirmarea va fi trimisă automat. Nu trebuie să copiezi sau să lipești comentarii.</p>
+    <button id="confirm" type="button">✓ AUTENTIFICĂ-TE ȘI CONFIRMĂ</button>
+    <div id="auth" class="panel" hidden>
+      <p>Deschide pagina oficială GitHub și introdu codul de mai jos:</p>
+      <div id="user-code" class="code"></div>
+      <a id="verify-link" class="link secondary" href="https://github.com/login/device" target="_blank" rel="noopener noreferrer">Deschide GitHub pentru autorizare</a>
+      <p class="small">După ce aprobi accesul, revino aici. Pagina verifică automat autorizarea.</p>
+    </div>
     <div id="status" class="status" role="status" aria-live="polite"></div>
-    <code id="marker" hidden></code>
-    <a id="issue-link" class="issue-link" hidden target="_blank" rel="noopener noreferrer">Deschide issue-ul GitHub</a>
-    <p class="small">Nu distribui linkul unic al sesiunii. Confirmarea folosește doar GitHub; pagina aceasta este statică și nu trimite date către servicii externe.</p>
+    <p class="small">Fluxul folosește GitHub OAuth Device Flow și GitHub Actions. Tokenul nu este salvat în local storage și este eliminat din memorie după confirmare. GitHub poate cere autorizare pentru acces la repository-uri publice.</p>
   </main>
   <script>
-    const params = new URLSearchParams(location.search);
-    const issue = params.get("issue");
-    const token = params.get("token");
-    const button = document.getElementById("confirm");
-    const status = document.getElementById("status");
-    const marker = document.getElementById("marker");
-    const issueLink = document.getElementById("issue-link");
-    const valid = issue && /^\d{1,10}$/.test(issue) && token && /^[a-f0-9]{64}$/.test(token);
-    const confirmation = valid ? "CCTV_TEST_CONFIRM:" + token : "";
-    const issueUrl = valid ? "https://github.com/Iustin-dev2014/IMMERSIVE-CCTV/issues/" + issue : "";
+    (() => {
+      "use strict";
+      const CLIENT_ID = "Ov23li2hQcWCLtRnJwVs";
+      const OWNER = "Iustin-dev2014";
+      const REPO = "IMMERSIVE-CCTV";
+      const SCOPE = "public_repo";
+      const params = new URLSearchParams(location.search);
+      const issue = params.get("issue");
+      const nonce = params.get("token");
+      const valid = /^\d{1,10}$/.test(issue || "") && /^[a-f0-9]{64}$/.test(nonce || "");
+      const button = document.getElementById("confirm");
+      const status = document.getElementById("status");
+      const auth = document.getElementById("auth");
+      const userCode = document.getElementById("user-code");
+      const intro = document.getElementById("intro");
+      let accessToken = "";
+      let stopped = false;
 
-    if (!valid) {
-      button.disabled = true;
-      status.className = "status err";
-      status.textContent = "Link invalid sau incomplet. Pornește un test nou din GitHub Actions.";
-    }
-
-    button.addEventListener("click", async () => {
-      if (!valid || button.disabled) return;
-      marker.hidden = false;
-      marker.textContent = confirmation;
-      issueLink.hidden = false;
-      issueLink.href = issueUrl;
-      status.className = "status";
-      window.open(issueUrl, "_blank", "noopener,noreferrer");
-      try {
-        await navigator.clipboard.writeText(confirmation);
-        status.className = "status ok";
-        status.textContent = "Cod copiat! În issue-ul GitHub care se deschide, lipește codul într-un comentariu și publică-l.";
-      } catch {
-        status.className = "status err";
-        status.textContent = "Copierea automată nu a mers. Selectează și copiază codul afișat, apoi lipește-l ca un comentariu în issue.";
+      function say(message, kind = "") {
+        status.className = "status " + kind;
+        status.textContent = message;
       }
-    });
+      function delay(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+      if (!valid) {
+        button.disabled = true;
+        say("Link invalid sau incomplet. Pornește un test nou din GitHub Actions.", "err");
+        return;
+      }
+
+      async function requestDeviceCode() {
+        const response = await fetch("https://github.com/login/device/code", {
+          method: "POST",
+          headers: { "Accept": "application/json", "Content-Type": "application/json" },
+          body: JSON.stringify({ client_id: CLIENT_ID, scope: SCOPE })
+        });
+        if (!response.ok) throw new Error("GitHub nu a putut porni autentificarea (HTTP " + response.status + ").");
+        const data = await response.json();
+        if (!data.device_code || !data.user_code) throw new Error(data.error_description || "GitHub nu a returnat codul de autentificare.");
+        return data;
+      }
+
+      async function pollForToken(device) {
+        const interval = Math.max(5, Number(device.interval) || 5) * 1000;
+        const expiresAt = Date.now() + (Number(device.expires_in) || 900) * 1000;
+        while (Date.now() < expiresAt && !stopped) {
+          await delay(interval);
+          const response = await fetch("https://github.com/login/oauth/access_token", {
+            method: "POST",
+            headers: { "Accept": "application/json", "Content-Type": "application/json" },
+            body: JSON.stringify({
+              client_id: CLIENT_ID,
+              device_code: device.device_code,
+              grant_type: "urn:ietf:params:oauth:grant-type:device_code"
+            })
+          });
+          const data = await response.json();
+          if (data.access_token) return data.access_token;
+          if (data.error === "authorization_pending") continue;
+          if (data.error === "slow_down") { await delay(5000); continue; }
+          throw new Error(data.error_description || "Autorizarea GitHub a fost anulată sau a expirat.");
+        }
+        throw new Error("Codul de autorizare a expirat. Încearcă din nou.");
+      }
+
+      async function confirmOnGitHub(token) {
+        const api = "https://api.github.com/repos/" + OWNER + "/" + REPO + "/issues/" + issue + "/comments";
+        const response = await fetch(api, {
+          method: "POST",
+          headers: {
+            "Accept": "application/vnd.github+json",
+            "Authorization": "Bearer " + token,
+            "X-GitHub-Api-Version": "2022-11-28",
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ body: "CCTV_TEST_CONFIRM:" + nonce })
+        });
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.message || "GitHub a refuzat confirmarea (HTTP " + response.status + ").");
+        }
+      }
+
+      button.addEventListener("click", async () => {
+        if (button.disabled) return;
+        button.disabled = true;
+        auth.hidden = false;
+        intro.textContent = "Se pornește autentificarea oficială GitHub. Nu închide pagina până apare confirmarea.";
+        try {
+          say("1/3 — Se solicită codul de autorizare GitHub…");
+          const device = await requestDeviceCode();
+          userCode.textContent = device.user_code;
+          say("2/3 — Autorizează aplicația în GitHub. Aștept confirmarea…");
+          window.open("https://github.com/login/device", "_blank", "noopener,noreferrer");
+          accessToken = await pollForToken(device);
+          say("3/3 — Autentificat. Se trimite confirmarea către GitHub…");
+          await confirmOnGitHub(accessToken);
+          accessToken = "";
+          say("✓ Confirmare trimisă! GitHub Actions va valida automat sesiunea. Poți închide această filă.", "ok");
+          intro.textContent = "Test confirmat. Nu mai este necesară nicio acțiune.";
+          button.textContent = "CONFIRMARE TRIMISĂ";
+          auth.hidden = true;
+          try { window.close(); } catch {}
+        } catch (error) {
+          accessToken = "";
+          say(error && error.message ? error.message : "A apărut o eroare. Încearcă din nou.", "err");
+          button.disabled = false;
+          button.textContent = "REÎNCEARCĂ AUTENTIFICAREA";
+        }
+      });
+    })();
   </script>
 </body>
 </html>
