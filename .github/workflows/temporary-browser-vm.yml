@@ -83,14 +83,14 @@ jobs:
           export VM_SHUTDOWN_MARKER="$RUNNER_TEMP/vmtest/shutdown-requested"
           cat > "$RUNNER_TEMP/vmtest/vm-shell.rc" <<'SHELL_RC'
           shutdown() {
-            printf '\\n[WARNING] Linux session is shutting down. GitHub Actions will close this temporary workspace.\\n'
+            printf '\n[WARNING] Linux session is shutting down. GitHub Actions will close this temporary workspace.\n'
             touch "${VM_SHUTDOWN_MARKER}"
             exit 0
           }
           poweroff() { shutdown "$@"; }
           halt() { shutdown "$@"; }
           reboot() {
-            printf '\\n[WARNING] Reboot requested. Closing this temporary Linux workspace instead.\\n'
+            printf '\n[WARNING] Reboot requested. Closing this temporary Linux workspace instead.\n'
             touch "${VM_SHUTDOWN_MARKER}"
             exit 0
           }
