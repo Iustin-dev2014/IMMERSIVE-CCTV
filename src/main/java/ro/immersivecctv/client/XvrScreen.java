@@ -127,12 +127,12 @@ public class XvrScreen extends Screen {
         int row1Y = 22;
         if (count > 0) {
             int gap = 2;
-            int buttonW = Math.max(18, Math.min(42, (width - 8 - gap * (count - 1)) / count));
+            int buttonW = Math.max(26, Math.min(48, (width - 8 - gap * (count - 1)) / count));
             int total = count * buttonW + (count - 1) * gap;
             int x = (width - total) / 2;
             for (int i = 0; i < count; i++) {
                 final int selected = i;
-                Button b = Button.builder(Component.literal(String.format(java.util.Locale.ROOT, "%02d", i + 1)), button -> {
+                Button b = Button.builder(Component.literal(String.format(java.util.Locale.ROOT, "CAM %02d", i + 1)), button -> {
                     channel = selected;
                     playback = false;
                     playbackIndex = -1;
@@ -521,11 +521,12 @@ public class XvrScreen extends Screen {
         // main framebuffer while swapping the active Minecraft camera entity can capture the
         // player's own scene (including the monitor/XVR) instead of a stable camera-origin feed.
         // The fallback renderer traces rays from the selected camera's actual position and facing.
-        boolean nativeCameraFeed = false;
         boolean cameraFeedAvailable = live && !booting && activeXvr != null && activeXvr.isAccountConfigured()
                 && !playback && cameraPos != null && activeCamera != null && activeCamera.isOnline()
                 && activeCamera.isAuthenticated() && !activeCamera.mustChangePassword() && Minecraft.getInstance().level != null;
+        boolean nativeCameraFeed = cameraFeedAvailable;
         CameraViewController.restore();
+        ResourceLocation offscreenFeed = cameraFeedAvailable ? CameraFeeds.request(cameraPos) : null;
         int margin = 2;
         int top = 60;
         int bottom = height - 2;
@@ -650,6 +651,8 @@ public class XvrScreen extends Screen {
         } else {
             if (playback) {
                 drawCameraPixels(g, viewX, viewY, viewW, viewH);
+            } else if (cameraFeedAvailable && offscreenFeed != null) {
+                g.blit(offscreenFeed, viewX, viewY, 0, 0, viewW, viewH, 384, 216);
             } else if (cameraFeedAvailable) {
                 fallbackRenderer.render(g, cameraPos, filter, viewX, viewY, viewW, viewH);
             } else {
