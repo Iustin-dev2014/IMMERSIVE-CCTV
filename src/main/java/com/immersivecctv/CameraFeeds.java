@@ -98,10 +98,17 @@ public final class CameraFeeds {
     }
 
     private static final class CctvCamera extends Camera {
-        void aim(BlockGetter level, Entity entity, Vec3 pos, float yaw, float pitch) {
-            this.setup(level, entity, true, false, 1.0F);
+        void aim(BlockGetter level, Entity entity, Vec3 pos, float yaw, float pitch, float partialTick) {
+            // A CCTV camera is always a detached viewpoint. This is important for entity rendering:
+            // Minecraft must not treat the view as the player's first-person camera.
+            this.setup(level, entity, true, false, partialTick);
             this.setRotation(yaw, pitch);
             this.setPosition(pos.x, pos.y, pos.z);
+        }
+
+        @Override
+        public boolean isDetached() {
+            return true;
         }
     }
 
@@ -221,7 +228,9 @@ public final class CameraFeeds {
         Vec3 camPos = new Vec3(p.getX() + 0.5 + facing.getStepX() * 0.47,
                 p.getY() + 7.0 / 16.0,
                 p.getZ() + 0.5 + facing.getStepZ() * 0.47);
-        CAMERA.aim(mc.level, mc.player, camPos, facing.toYRot(), PITCH);
+        // Keep camera setup on the same partial tick as the world render so moving entities and
+        // players are interpolated smoothly instead of being evaluated at a hard-coded tick edge.
+        CAMERA.aim(mc.level, mc.player, camPos, facing.toYRot(), PITCH, partial);
 
         feed.target.setClearColor(0.05F, 0.05F, 0.06F, 1.0F);
         feed.target.clear(Minecraft.ON_OSX);
