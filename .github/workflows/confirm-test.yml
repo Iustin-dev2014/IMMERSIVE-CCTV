@@ -54,7 +54,7 @@ jobs:
           {
             echo "## Confirm this test in your browser"
             echo
-            echo "**Open this page and press CONFIRM TEST within 5 minutes:**"
+            echo "**Open the page, press the button, then paste the copied code as a comment on the GitHub issue within 5 minutes:**"
             echo
             echo "${page_url}"
             echo
@@ -77,7 +77,7 @@ jobs:
             comments="$(gh api --paginate "repos/${REPOSITORY}/issues/${ISSUE_NUMBER}/comments" --jq '.[].body' 2>/dev/null || true)"
             if printf '%s\n' "${comments}" | grep -Fqx "CCTV_TEST_CONFIRM:${NONCE}"; then
               echo "confirmed=true" >> "$GITHUB_OUTPUT"
-              echo "Confirmation received from the web page."
+              echo "Confirmation received from a GitHub issue comment."
               exit 0
             fi
             sleep 5
