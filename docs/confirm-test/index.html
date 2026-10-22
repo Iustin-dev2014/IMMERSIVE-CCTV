@@ -58,6 +58,7 @@
       issueLink.hidden = false;
       issueLink.href = issueUrl;
       status.className = "status";
+      window.open(issueUrl, "_blank", "noopener,noreferrer");
       try {
         await navigator.clipboard.writeText(confirmation);
         status.className = "status ok";
@@ -66,7 +67,6 @@
         status.className = "status err";
         status.textContent = "Copierea automată nu a mers. Selectează și copiază codul afișat, apoi lipește-l ca un comentariu în issue.";
       }
-      window.open(issueUrl, "_blank", "noopener,noreferrer");
     });
   </script>
 </body>
