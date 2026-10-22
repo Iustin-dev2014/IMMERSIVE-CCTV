@@ -14,8 +14,26 @@ concurrency:
 jobs:
   wait-for-confirmation:
     runs-on: ubuntu-latest
-    timeout-minutes: 7
+    timeout-minutes: 8
     steps:
+      - name: Verify confirmation page is published
+        shell: bash
+        run: |
+          set -euo pipefail
+          page_url="https://iustin-dev2014.github.io/IMMERSIVE-CCTV/confirm-test/"
+          echo "Checking that the confirmation page is published: ${page_url}"
+          for attempt in {1..12}; do
+            status="$(curl --silent --output /dev/null --write-out '%{http_code}' --location --max-time 15 "${page_url}" || true)"
+            if [[ "${status}" == "200" ]]; then
+              echo "Confirmation page is online."
+              exit 0
+            fi
+            echo "Attempt ${attempt}/12: page returned HTTP ${status:-no response}; retrying in 5 seconds."
+            sleep 5
+          done
+          echo "::error::The confirmation page is not published (expected HTTP 200). Check Settings > Pages and the 'Deploy Web Confirmation Page' workflow."
+          exit 1
+
       - name: Create confirmation session
         id: session
         env:
@@ -27,8 +45,8 @@ jobs:
           set -euo pipefail
           nonce="$(openssl rand -hex 32)"
           title="[CCTV TEST CONFIRM] Run ${RUN_ID}"
-          issue_url="$(gh api "repos/${REPOSITORY}/issues" -f title="${title}" -f body="Temporary confirmation session for Actions run ${RUN_ID}. This issue is automatically closed when the session finishes.")"
-          issue_number="$(printf '%s' "$issue_url" | jq -r '.number')"
+          issue_json="$(gh api "repos/${REPOSITORY}/issues" -f title="${title}" -f body="Temporary confirmation session for Actions run ${RUN_ID}. This issue is automatically closed when the session finishes.")"
+          issue_number="$(printf '%s' "${issue_json}" | jq -r '.number')"
           page_url="https://iustin-dev2014.github.io/IMMERSIVE-CCTV/confirm-test/?issue=${issue_number}&token=${nonce}"
           echo "issue_number=${issue_number}" >> "$GITHUB_OUTPUT"
           echo "nonce=${nonce}" >> "$GITHUB_OUTPUT"
@@ -57,7 +75,7 @@ jobs:
           deadline=$((SECONDS + 300))
           while (( SECONDS < deadline )); do
             comments="$(gh api --paginate "repos/${REPOSITORY}/issues/${ISSUE_NUMBER}/comments" --jq '.[].body' 2>/dev/null || true)"
-            if printf '%s\n' "$comments" | grep -Fqx "CCTV_TEST_CONFIRM:${NONCE}"; then
+            if printf '%s\n' "${comments}" | grep -Fqx "CCTV_TEST_CONFIRM:${NONCE}"; then
               echo "confirmed=true" >> "$GITHUB_OUTPUT"
               echo "Confirmation received from the web page."
               exit 0
