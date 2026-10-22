@@ -1,4 +1,4 @@
-name: Temporary Browser VM (5 minutes)
+name: Temporary Browser VM (10 minutes)
 
 on:
   workflow_dispatch:
@@ -14,7 +14,7 @@ jobs:
   browser-vm:
     name: Start temporary browser terminal
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Check out VM UI assets
         uses: actions/checkout@v4
@@ -82,6 +82,7 @@ jobs:
           # Treat an intentional Linux shutdown as a normal end to this temporary workspace.
           export VM_SHUTDOWN_MARKER="$RUNNER_TEMP/vmtest/shutdown-requested"
           cat > "$RUNNER_TEMP/vmtest/vm-shell.rc" <<'SHELL_RC'
+          export PS1='[user]@immersive-cctv! '
           shutdown() {
             printf '\n[WARNING] Linux session is shutting down. GitHub Actions will close this temporary workspace.\n'
             touch "${VM_SHUTDOWN_MARKER}"
@@ -209,12 +210,12 @@ jobs:
           echo "  Username: cctvtest"
           echo "  Password: the value you saved as VM_WEB_PASSWORD"
           echo "$URL"
-          echo "The session will close automatically after 5 minutes."
+          echo "The session will close automatically after 10 minutes."
           echo "Do not share the URL or password."
           echo "=================================================="
 
-          # Poll for a deliberate shutdown request while keeping the five-minute limit.
-          for remaining_seconds in $(seq 1 300); do
+          # Poll for a deliberate shutdown request while keeping the ten-minute limit.
+          for remaining_seconds in $(seq 1 600); do
             if [[ -f "$VM_SHUTDOWN_MARKER" ]]; then
               echo "::warning::Linux was shut down by the user; closing the temporary browser VM workflow normally."
               echo "The Linux session is closed. This GitHub Actions workspace will now close too."
@@ -222,4 +223,4 @@ jobs:
             fi
             sleep 1
           done
-          echo "Five minutes elapsed. Closing the temporary browser VM now."
+          echo "Ten minutes elapsed. Closing the temporary browser VM now."
