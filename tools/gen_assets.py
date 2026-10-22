@@ -598,8 +598,10 @@ license="MIT"
 
 [[mods]]
 modId="immersivecctv"
-version="0.2.0"
-displayName="Immersive CCTV"
+version="1.6.0"
+displayName="IMMERSIVE CCTV"
+authors="Iustin Martac (Iustin-dev)"
+displayURL="https://github.com/Iustin-dev2014/IMMERSIVE-CCTV"
 description=\'\'\'Realistic CCTV: 16-channel XVR, monitor, cameras with real live view, HDMI and Ethernet cables.\'\'\'
 
 [[dependencies.immersivecctv]]

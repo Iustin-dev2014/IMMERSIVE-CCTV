@@ -33,6 +33,17 @@ dependencies {
 }
 
 tasks.named('jar', Jar).configure {
+    manifest {
+        attributes([
+            'Specification-Title'    : 'IMMERSIVE CCTV',
+            'Specification-Vendor'   : 'Iustin Martac (Iustin-dev)',
+            'Specification-Version'  : project.version,
+            'Implementation-Title'   : 'IMMERSIVE CCTV',
+            'Implementation-Version' : project.version,
+            'Implementation-Vendor'  : 'Iustin Martac (Iustin-dev)',
+            'Implementation-URL'     : 'https://github.com/Iustin-dev2014/IMMERSIVE-CCTV'
+        ])
+    }
     finalizedBy 'reobfJar'
 }
 
