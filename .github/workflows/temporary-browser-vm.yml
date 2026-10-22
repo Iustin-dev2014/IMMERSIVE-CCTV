@@ -16,6 +16,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
+      - name: Check out VM UI assets
+        uses: actions/checkout@v4
+
       - name: Check required password secret
         shell: bash
         env:
@@ -32,8 +35,8 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y ttyd
-
           mkdir -p "$RUNNER_TEMP/vmtest"
+          npm install --prefix "$RUNNER_TEMP/vmtest/proxy" --no-save http-proxy@1.18.1
           curl --fail --silent --show-error --location \
             "https://github.com/cloudflare/cloudflared/releases/download/2026.10.1/cloudflared-linux-amd64" \
             -o "$RUNNER_TEMP/vmtest/cloudflared"
@@ -52,6 +55,7 @@ jobs:
 
           TTYD_BIN="$(command -v ttyd)"
           CLOUDFLARED="$RUNNER_TEMP/vmtest/cloudflared"
+          export NODE_PATH="$RUNNER_TEMP/vmtest/proxy/node_modules"
 
           # Pick a free local port instead of assuming 7681 is always available.
           TTYD_PORT="$(python3 - <<'PY'
@@ -84,6 +88,26 @@ jobs:
           }
           TUNNEL_PID=""
           trap cleanup EXIT
+
+          # Verify the injected UI is actually served before publishing the tunnel URL.
+          UI_READY=0
+          for ui_attempt in $(seq 1 20); do
+            if curl --fail --silent --show-error --user "cctvtest:\${VM_WEB_PASSWORD}" \\
+              "http://127.0.0.1:\${VM_UI_PORT}/" -o "\$RUNNER_TEMP/vmtest/ui-check.html" 2>/dev/null \\
+              && grep -q "VM CONSOLE" "\$RUNNER_TEMP/vmtest/ui-check.html" \\
+              && grep -q 'data-chord="ctrl+c"' "\$RUNNER_TEMP/vmtest/ui-check.html"; then
+              UI_READY=1
+              break
+            fi
+            sleep 1
+          done
+          if [[ "\$UI_READY" -ne 1 ]]; then
+            echo "::error::Modern terminal UI failed its local smoke test."
+            cat "\$RUNNER_TEMP/vmtest/vm-ui-proxy.log" || true
+            cat "\$RUNNER_TEMP/vmtest/ttyd.log" || true
+            exit 1
+          fi
+          echo "Modern terminal UI smoke test passed."
 
           URL=""
           for tunnel_attempt in $(seq 1 5); do
@@ -135,7 +159,7 @@ jobs:
           fi
 
           echo "=================================================="
-          echo "TEMPORARY BROWSER VM IS READY"
+          echo "TEMPORARY BROWSER VM WITH MODERN TOUCH UI IS READY"
           echo "Open this URL and sign in with:"
           echo "  Username: cctvtest"
           echo "  Password: the value you saved as VM_WEB_PASSWORD"
