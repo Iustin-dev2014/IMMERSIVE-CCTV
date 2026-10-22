@@ -62,7 +62,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           echo "Confirmation page: ${page_url}"
 
-      - name: Wait up to five minutes for owner comment
+      - name: Wait up to five minutes for confirmation comment
         id: wait
         env:
           GH_TOKEN: ${{ github.token }}
@@ -75,17 +75,17 @@ jobs:
           deadline=$((SECONDS + 300))
           while (( SECONDS < deadline )); do
             comments="$(gh api --paginate "repos/${REPOSITORY}/issues/${ISSUE_NUMBER}/comments" 2>/dev/null || echo '[]')"
-            if printf '%s' "${comments}" | jq -e --arg marker "CCTV_TEST_CONFIRM:${NONCE}" --arg owner "Iustin-dev2014" '[.[] | select(.body == $marker and .user.login == $owner)] | length > 0' >/dev/null; then
+            if printf '%s' "${comments}" | jq -e --arg marker "CCTV_TEST_CONFIRM:${NONCE}" '[.[] | select(.body == $marker)] | length > 0' >/dev/null; then
               echo "confirmed=true" >> "$GITHUB_OUTPUT"
-              echo "Owner confirmation received through the GitHub issue comment."
+              echo "Confirmation received through the GitHub issue comment."
               exit 0
             fi
             sleep 5
           done
           echo "confirmed=false" >> "$GITHUB_OUTPUT"
-          echo "No owner confirmation received within five minutes; ending the session."
+          echo "No confirmation received within five minutes; ending the session."
 
-      - name: Permanently delete temporary confirmation issue
+      - name: Close temporary confirmation issue
         if: always() && steps.session.outputs.issue_number != ''
         env:
           GH_TOKEN: ${{ github.token }}
@@ -97,27 +97,25 @@ jobs:
         run: |
           set -euo pipefail
           issue_json="$(gh api "repos/${REPOSITORY}/issues/${ISSUE_NUMBER}")"
-          issue_node_id="$(printf '%s' "${issue_json}" | jq -r '.node_id')"
-          if [[ -z "${issue_node_id}" || "${issue_node_id}" == "null" ]]; then
-            echo "::error::Could not get the temporary issue's GraphQL node ID; permanent deletion was not attempted."
-            exit 1
+          issue_state="$(printf '%s' "${issue_json}" | jq -r '.state')"
+          if [[ "${issue_state}" != "closed" ]]; then
+            gh api --method PATCH "repos/${REPOSITORY}/issues/${ISSUE_NUMBER}" -f state=closed >/dev/null
           fi
           if [[ "${CONFIRMED:-false}" == "true" ]]; then
             {
               echo "## ✅ Confirmation received"
               echo
-              echo "The workflow validated the exact one-time comment from **Iustin-dev2014**."
+              echo "The workflow validated the exact one-time comment. Any commenter with access to the issue was allowed."
               echo
-              echo "The temporary issue was then permanently deleted."
+              echo "The temporary issue was then closed to keep the repository tidy."
             } >> "$GITHUB_STEP_SUMMARY"
           else
             {
               echo "## ⌛ Confirmation timed out"
               echo
-              echo "No valid comment from **Iustin-dev2014** was received within 5 minutes."
+              echo "No exact confirmation comment was received within 5 minutes."
               echo
-              echo "The temporary issue was then permanently deleted."
+              echo "The temporary issue was then closed to keep the repository tidy."
             } >> "$GITHUB_STEP_SUMMARY"
           fi
-          gh api graphql -f query='mutation($id: ID!) { deleteIssue(input: {issueId: $id}) { clientMutationId } }' -F id="${issue_node_id}"
-          echo "Temporary issue #${ISSUE_NUMBER} was permanently deleted."
+          echo "Temporary issue #${ISSUE_NUMBER} was closed."
