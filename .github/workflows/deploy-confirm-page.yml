@@ -28,9 +28,7 @@ jobs:
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
-        with:
-          # Attempt to enable Pages automatically if the repository has not enabled it yet.
-          enablement: true
+        # GitHub Pages must first be enabled in repository Settings > Pages.
 
       - name: Upload website
         uses: actions/upload-pages-artifact@v3
