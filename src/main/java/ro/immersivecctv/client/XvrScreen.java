@@ -127,12 +127,12 @@ public class XvrScreen extends Screen {
         int row1Y = 22;
         if (count > 0) {
             int gap = 2;
-            int buttonW = Math.max(26, Math.min(48, (width - 8 - gap * (count - 1)) / count));
+            int buttonW = Math.max(18, Math.min(42, (width - 8 - gap * (count - 1)) / count));
             int total = count * buttonW + (count - 1) * gap;
             int x = (width - total) / 2;
             for (int i = 0; i < count; i++) {
                 final int selected = i;
-                Button b = Button.builder(Component.literal(String.format(java.util.Locale.ROOT, "CAM %02d", i + 1)), button -> {
+                Button b = Button.builder(Component.literal(String.format(java.util.Locale.ROOT, "%02d", i + 1)), button -> {
                     channel = selected;
                     playback = false;
                     playbackIndex = -1;
