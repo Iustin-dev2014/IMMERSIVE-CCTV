@@ -94,6 +94,15 @@ jobs:
             touch "${VM_SHUTDOWN_MARKER}"
             exit 0
           }
+          sudo() {
+            local arg
+            for arg in "$@"; do
+              case "${arg##*/}" in
+                shutdown|poweroff|halt|reboot) shutdown "$@"; return $? ;;
+              esac
+            done
+            command sudo "$@"
+          }
           SHELL_RC
 
           # Keep ttyd as the terminal engine; the proxy adds the touch-first interface.
