@@ -25,10 +25,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+        with:
+          # Attempt to enable Pages automatically if the repository has not enabled it yet.
+          enablement: true
+
+      - name: Upload website
+        uses: actions/upload-pages-artifact@v3
         with:
           path: docs
-      - name: Deploy to GitHub Pages
+
+      - name: Deploy website
         id: deployment
         uses: actions/deploy-pages@v4
