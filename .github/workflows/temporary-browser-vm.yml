@@ -32,9 +32,6 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/vmtest"
 
-          # Pin exact releases instead of using /releases/latest/download.
-          # ttyd 1.7.7: https://github.com/tsl0922/ttyd/releases/tag/1.7.7
-          # cloudflared 2026.10.1: https://github.com/cloudflare/cloudflared/releases/tag/2026.10.1
           download_asset() {
             local label="$1"
             local url="$2"
@@ -47,8 +44,6 @@ jobs:
             echo "Pinned URL: ${url}"
             rm -f "$temporary"
 
-            # Do not use curl --fail here: capture the HTTP status explicitly,
-            # so a 404 is reported with the exact URL instead of a generic curl error.
             set +e
             http_status="$(curl --silent --show-error --location \
               --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 120 \
@@ -58,15 +53,6 @@ jobs:
 
             if [[ "$curl_status" -ne 0 || "$http_status" != "200" ]]; then
               echo "::error title=Asset download failed::${label}: URL=${url} HTTP_STATUS=${http_status:-unknown} CURL_EXIT=${curl_status}"
-              if [[ "$http_status" == "404" ]]; then
-                echo "::error::HTTP 404 means GitHub could not find this exact pinned release asset. Check the tag and filename shown above."
-              elif [[ "$http_status" == "403" ]]; then
-                echo "::error::HTTP 403: access denied or request rate-limited by the hosting service."
-              elif [[ "$http_status" == "000" || -z "$http_status" ]]; then
-                echo "::error::No HTTP response received. Check DNS, network connectivity, TLS, or a temporary GitHub outage."
-              elif [[ "$http_status" =~ ^5 ]]; then
-                echo "::error::The hosting server returned HTTP ${http_status}; this may be a temporary server-side problem."
-              fi
               if [[ -s "$temporary" ]]; then
                 echo "Response body preview (first 300 bytes; may be an error page):"
                 head -c 300 "$temporary" || true
@@ -103,11 +89,19 @@ jobs:
           TTYD="$RUNNER_TEMP/vmtest/ttyd"
           CLOUDFLARED="$RUNNER_TEMP/vmtest/cloudflared"
 
-          # The browser terminal is password-protected. Do not print the password.
-          # Start a clean shell so workflow secrets and GitHub runtime variables are not inherited.
-          "$TTYD" --interface 127.0.0.1 --port 7681 --credential "cctvtest:${VM_WEB_PASSWORD}" --writable \
-            env -i HOME="$HOME" USER="$USER" PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" TERM=xterm-256color \
-            bash --noprofile --norc > "$RUNNER_TEMP/vmtest/ttyd.log" 2>&1 &
+          # Use a genuinely interactive shell and a visible prompt. Increase xterm.js
+          # font size/line height so the terminal is readable on a phone.
+          "$TTYD" --interface 127.0.0.1 --port 7681 \
+            --credential "cctvtest:${VM_WEB_PASSWORD}" --writable \
+            --client-option fontSize=18 \
+            --client-option lineHeight=1.2 \
+            --client-option cursorBlink=true \
+            --client-option scrollback=5000 \
+            env -i HOME="$HOME" USER="$USER" \
+              PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+              TERM=xterm-256color \
+              bash --noprofile --norc -i \
+              > "$RUNNER_TEMP/vmtest/ttyd.log" 2>&1 &
           TTYD_PID=$!
 
           cleanup() {
@@ -121,8 +115,6 @@ jobs:
           TUNNEL_PID=""
           trap cleanup EXIT
 
-          # Quick Tunnel provisioning can temporarily fail with Cloudflare 409/Tunnelstore errors.
-          # Retry with a fresh process and log file instead of failing on the first response.
           URL=""
           for tunnel_attempt in $(seq 1 5); do
             echo "Starting Cloudflare Quick Tunnel (attempt ${tunnel_attempt}/5)..."
@@ -142,8 +134,6 @@ jobs:
                 break
               fi
 
-              # If cloudflared exited (for example, Tunnelstore returned HTTP 409),
-              # stop waiting and move to the next attempt.
               if ! kill -0 "$TUNNEL_PID" 2>/dev/null; then
                 break
               fi
@@ -168,7 +158,7 @@ jobs:
           done
 
           if [[ -z "$URL" ]]; then
-            echo "::error::Could not obtain a temporary tunnel URL after 5 attempts. Cloudflare Quick Tunnel provisioning may be temporarily unavailable."
+            echo "::error::Could not obtain a temporary tunnel URL after 5 attempts."
             echo "Final Cloudflared output:"
             cat "$RUNNER_TEMP/vmtest/cloudflared.log"
             exit 1
@@ -184,6 +174,5 @@ jobs:
           echo "Do not share the URL or password."
           echo "=================================================="
 
-          # Keep the runner alive for exactly five minutes after the tunnel is ready.
           sleep 300
           echo "Five minutes elapsed. Closing the temporary browser VM now."
