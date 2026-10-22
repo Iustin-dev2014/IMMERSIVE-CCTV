@@ -45,7 +45,7 @@ jobs:
           set -euo pipefail
           nonce="$(openssl rand -hex 32)"
           title="[CCTV TEST CONFIRM] Run ${RUN_ID}"
-          issue_json="$(gh api "repos/${REPOSITORY}/issues" -f title="${title}" -f body="Temporary confirmation session for Actions run ${RUN_ID}. This issue is automatically closed when the session finishes.")"
+          issue_json="$(gh api "repos/${REPOSITORY}/issues" -f title="${title}" -f body="Temporary confirmation session for Actions run ${RUN_ID}. It is permanently deleted when the session ends.")"
           issue_number="$(printf '%s' "${issue_json}" | jq -r '.number')"
           page_url="https://iustin-dev2014.github.io/IMMERSIVE-CCTV/confirm-test/?issue=${issue_number}&token=${nonce}"
           echo "issue_number=${issue_number}" >> "$GITHUB_OUTPUT"
@@ -54,15 +54,15 @@ jobs:
           {
             echo "## Confirm this test in your browser"
             echo
-            echo "**Open the page and press the confirmation button. Sign in through GitHub's official device authorization page; no manual comment is needed.**"
+            echo "Open the page, copy the unique code, then post it as a comment on the temporary issue. The comment must come from **Iustin-dev2014**."
             echo
             echo "${page_url}"
             echo
-            echo "The session automatically expires after 5 minutes."
+            echo "The session expires after 5 minutes. The temporary issue is permanently deleted afterward."
           } >> "$GITHUB_STEP_SUMMARY"
           echo "Confirmation page: ${page_url}"
 
-      - name: Wait up to five minutes for owner confirmation
+      - name: Wait up to five minutes for owner comment
         id: wait
         env:
           GH_TOKEN: ${{ github.token }}
@@ -77,37 +77,47 @@ jobs:
             comments="$(gh api --paginate "repos/${REPOSITORY}/issues/${ISSUE_NUMBER}/comments" 2>/dev/null || echo '[]')"
             if printf '%s' "${comments}" | jq -e --arg marker "CCTV_TEST_CONFIRM:${NONCE}" --arg owner "Iustin-dev2014" '[.[] | select(.body == $marker and .user.login == $owner)] | length > 0' >/dev/null; then
               echo "confirmed=true" >> "$GITHUB_OUTPUT"
-              echo "Owner confirmation received through the GitHub API."
+              echo "Owner confirmation received through the GitHub issue comment."
               exit 0
             fi
             sleep 5
           done
           echo "confirmed=false" >> "$GITHUB_OUTPUT"
-          echo "No owner confirmation received within five minutes; ending the session automatically."
+          echo "No owner confirmation received within five minutes; ending the session."
 
-      - name: Close confirmation session
+      - name: Permanently delete temporary confirmation issue
         if: always() && steps.session.outputs.issue_number != ''
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
           ISSUE_NUMBER: ${{ steps.session.outputs.issue_number }}
           CONFIRMED: ${{ steps.wait.outputs.confirmed }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         shell: bash
         run: |
           set -euo pipefail
+          issue_json="$(gh api "repos/${REPOSITORY}/issues/${ISSUE_NUMBER}")"
+          issue_node_id="$(printf '%s' "${issue_json}" | jq -r '.node_id')"
+          if [[ -z "${issue_node_id}" || "${issue_node_id}" == "null" ]]; then
+            echo "::error::Could not get the temporary issue's GraphQL node ID; permanent deletion was not attempted."
+            exit 1
+          fi
           if [[ "${CONFIRMED:-false}" == "true" ]]; then
-            gh api "repos/${REPOSITORY}/issues/${ISSUE_NUMBER}/comments" -f body="✅ Web confirmation received from the repository owner. Session closed."
             {
               echo "## ✅ Confirmation received"
               echo
-              echo "The website sent the confirmation and the workflow validated it against the repository owner account."
+              echo "The workflow validated the exact one-time comment from **Iustin-dev2014**."
+              echo
+              echo "The temporary issue was then permanently deleted."
             } >> "$GITHUB_STEP_SUMMARY"
           else
-            gh api "repos/${REPOSITORY}/issues/${ISSUE_NUMBER}/comments" -f body="⌛ Session expired: no valid confirmation from the repository owner within 5 minutes."
             {
               echo "## ⌛ Confirmation timed out"
               echo
-              echo "No valid confirmation was received within 5 minutes."
+              echo "No valid comment from **Iustin-dev2014** was received within 5 minutes."
+              echo
+              echo "The temporary issue was then permanently deleted."
             } >> "$GITHUB_STEP_SUMMARY"
           fi
-          gh api --method PATCH "repos/${REPOSITORY}/issues/${ISSUE_NUMBER}" -f state=closed >/dev/null
+          gh api graphql -f query='mutation($id: ID!) { deleteIssue(input: {issueId: $id}) { clientMutationId } }' -F id="${issue_node_id}"
+          echo "Temporary issue #${ISSUE_NUMBER} was permanently deleted."
