@@ -26,58 +26,21 @@ jobs:
             exit 1
           fi
 
-      - name: Download pinned tools (with HTTP diagnostics)
+      - name: Install browser terminal and tunnel tools
         shell: bash
         run: |
           set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y ttyd
+
           mkdir -p "$RUNNER_TEMP/vmtest"
-
-          download_asset() {
-            local label="$1"
-            local url="$2"
-            local destination="$3"
-            local temporary="${destination}.part"
-            local http_status=""
-            local curl_status=0
-
-            echo "::group::Download ${label}"
-            echo "Pinned URL: ${url}"
-            rm -f "$temporary"
-
-            set +e
-            http_status="$(curl --silent --show-error --location \
-              --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 120 \
-              --output "$temporary" --write-out '%{http_code}' "$url")"
-            curl_status=$?
-            set -e
-
-            if [[ "$curl_status" -ne 0 || "$http_status" != "200" ]]; then
-              echo "::error title=Asset download failed::${label}: URL=${url} HTTP_STATUS=${http_status:-unknown} CURL_EXIT=${curl_status}"
-              if [[ -s "$temporary" ]]; then
-                echo "Response body preview (first 300 bytes; may be an error page):"
-                head -c 300 "$temporary" || true
-                echo
-              fi
-              rm -f "$temporary"
-              echo "::endgroup::"
-              exit 1
-            fi
-
-            mv "$temporary" "$destination"
-            echo "Download OK: ${label} (HTTP ${http_status})"
-            echo "::endgroup::"
-          }
-
-          download_asset "ttyd 1.7.7" \
-            "https://github.com/tsl0922/ttyd/releases/download/1.7.7/ttyd.x86_64" \
-            "$RUNNER_TEMP/vmtest/ttyd"
-
-          download_asset "cloudflared 2026.10.1" \
+          curl --fail --silent --show-error --location \
             "https://github.com/cloudflare/cloudflared/releases/download/2026.10.1/cloudflared-linux-amd64" \
-            "$RUNNER_TEMP/vmtest/cloudflared"
+            -o "$RUNNER_TEMP/vmtest/cloudflared"
+          chmod 700 "$RUNNER_TEMP/vmtest/cloudflared"
 
-          chmod 700 "$RUNNER_TEMP/vmtest/ttyd" "$RUNNER_TEMP/vmtest/cloudflared"
-          "$RUNNER_TEMP/vmtest/ttyd" --version
+          command -v ttyd
+          ttyd --version
           "$RUNNER_TEMP/vmtest/cloudflared" --version
 
       - name: Start protected terminal and temporary public tunnel
@@ -86,22 +49,14 @@ jobs:
           VM_WEB_PASSWORD: ${{ secrets.VM_WEB_PASSWORD }}
         run: |
           set -euo pipefail
-          TTYD="$RUNNER_TEMP/vmtest/ttyd"
+          TTYD_BIN="$(command -v ttyd)"
           CLOUDFLARED="$RUNNER_TEMP/vmtest/cloudflared"
 
-          # Use a genuinely interactive shell and a visible prompt. Increase xterm.js
-          # font size/line height so the terminal is readable on a phone.
-          "$TTYD" --interface 127.0.0.1 --port 7681 \
+          # Start a clean interactive shell without forcing a minimal environment.
+          "$TTYD_BIN" --interface 127.0.0.1 --port 7681 \
             --credential "cctvtest:${VM_WEB_PASSWORD}" --writable \
-            --client-option fontSize=18 \
-            --client-option lineHeight=1.2 \
-            --client-option cursorBlink=true \
-            --client-option scrollback=5000 \
-            env -i HOME="$HOME" USER="$USER" \
-              PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
-              TERM=xterm-256color \
-              bash --noprofile --norc -i \
-              > "$RUNNER_TEMP/vmtest/ttyd.log" 2>&1 &
+            bash --noprofile --norc -i \
+            > "$RUNNER_TEMP/vmtest/ttyd.log" 2>&1 &
           TTYD_PID=$!
 
           cleanup() {
@@ -129,7 +84,7 @@ jobs:
                 exit 1
               fi
 
-              URL="$(grep -Eo 'https://[a-zA-Z0-9.-]+\.trycloudflare\.com' "$RUNNER_TEMP/vmtest/cloudflared.log" | head -n 1 || true)"
+              URL="$(grep -Eo 'https://[^[:space:]]+trycloudflare\.com' "$RUNNER_TEMP/vmtest/cloudflared.log" | head -n 1 || true)"
               if [[ -n "$URL" ]]; then
                 break
               fi
