@@ -1,8 +1,0 @@
-{
-  "variants": {
-    "facing=north": { "model": "immersivecctv:block/power_outlet" },
-    "facing=east": { "model": "immersivecctv:block/power_outlet", "y": 90 },
-    "facing=south": { "model": "immersivecctv:block/power_outlet", "y": 180 },
-    "facing=west": { "model": "immersivecctv:block/power_outlet", "y": 270 }
-  }
-}

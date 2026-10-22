@@ -1,8 +1,11 @@
 pluginManagement {
     repositories {
         gradlePluginPortal()
-        maven { url = 'https://maven.minecraftforge.net/' }
-        mavenCentral()
+        maven {
+            name = 'MinecraftForge'
+            url = 'https://maven.minecraftforge.net/'
+        }
     }
 }
-rootProject.name = 'immersive-cctv'
+
+rootProject.name = 'immersivecctv'

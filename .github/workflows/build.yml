@@ -1,51 +1,24 @@
-name: Build IMMERSIVE CCTV (Forge 1.20.1)
-
+name: Build Immersive CCTV
 on:
   push:
-    branches: [main, "feature/**"]
-  pull_request:
   workflow_dispatch:
-
-permissions:
-  contents: read
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out the actual repository source
-        uses: actions/checkout@v4
-
-      - name: Set up Java 17
-        uses: actions/setup-java@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: "17"
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.1.1"
-
-      - name: Install audio encoder for generated sound assets
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
-
-      - name: Generate hardware textures and sound effects
-        run: |
-          python3 scripts/generate_textures.py
-          python3 scripts/generate_sounds.py
-
-      - name: Validate resource IDs and JSON
-        run: python3 scripts/validate_resources.py
-
-      - name: Compile and package the real project
+          gradle-version: '8.1.1'
+      - name: Generate textures, models and data resources
+        run: python3 tools/gen_assets.py
+      - name: Compile and package mod
         run: gradle --no-daemon clean build
-
-      - name: Upload mod JAR
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: immersivecctv-${{ github.sha }}
+          name: immersivecctv-jar
           path: build/libs/*.jar
-          if-no-files-found: error

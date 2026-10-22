@@ -1,9 +1,0 @@
-.gradle/
-build/
-run/
-run-data/
-.idea/
-*.iml
-__pycache__/
-*.pyc
-.DS_Store
