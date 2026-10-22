@@ -13,7 +13,7 @@ const proxy = httpProxy.createProxyServer({
   proxyTimeout: 30000
 });
 
-const injectedHead = String.raw\`
+const injectedHead = String.raw`
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#090d16">
 <style id="vm-modern-ui">
@@ -52,9 +52,9 @@ body{display:flex;flex-direction:column;padding:env(safe-area-inset-top) 0 env(s
 @media(max-width:520px){#vm-appbar{min-height:54px;padding:8px 11px;gap:8px}#vm-logo{width:33px;height:33px;border-radius:10px}#vm-brandcopy strong{font-size:12px}#vm-brandcopy span{font-size:10px}#vm-live{padding:6px 8px;font-size:10px}#vm-toolbar{padding:8px 8px 9px;gap:7px}.vm-keyrow{gap:6px}.vm-key{min-width:42px;min-height:43px;padding:0 10px;font-size:13px;border-radius:11px}.vm-key.vm-wide{min-width:57px}#vm-terminal-wrap{padding:8px 7px 7px}#terminal{border-radius:10px}#terminal .xterm{padding:7px 4px}#vm-footer{padding:7px 10px calc(7px + env(safe-area-inset-bottom));font-size:10px}}
 @media(max-height:500px){#vm-appbar{min-height:44px;padding-top:5px;padding-bottom:5px}#vm-logo{width:29px;height:29px}#vm-toolbar{padding-top:5px;padding-bottom:5px;gap:4px}.vm-key{min-height:34px}#vm-terminal-wrap{padding-top:5px;padding-bottom:5px}#vm-footer{padding-top:4px;padding-bottom:4px}}
 </style>
-\`;
+`;
 
-const injectedBody = String.raw\`
+const injectedBody = String.raw`
 <div id="vm-appbar">
   <div id="vm-brand"><div id="vm-logo" aria-hidden="true">›_</div><div id="vm-brandcopy"><strong>VM CONSOLE</strong><span>Temporary interactive workspace</span></div></div>
   <div id="vm-live"><i></i> SESSION ACTIVE</div>
@@ -105,7 +105,7 @@ const injectedBody = String.raw\`
   window.addEventListener('resize',function(){var el=terminalInput();if(el)el.style.fontSize='16px';});
 })();
 </script>
-\`;
+`;
 
 function inject(html) {
   let output = html;
