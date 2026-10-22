@@ -27,9 +27,18 @@ jobs:
         with:
           gradle-version: "8.1.1"
 
-      - name: Validate generated resources
+      - name: Install audio encoder for generated sound assets
         run: |
-          python3 scripts/validate_resources.py
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Generate hardware textures and sound effects
+        run: |
+          python3 scripts/generate_textures.py
+          python3 scripts/generate_sounds.py
+
+      - name: Validate resource IDs and JSON
+        run: python3 scripts/validate_resources.py
 
       - name: Compile and package the real project
         run: gradle --no-daemon clean build
