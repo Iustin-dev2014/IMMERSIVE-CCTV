@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#101827">
+  <title>IMMERSIVE CCTV — Confirm test</title>
+  <style>
+    :root{color-scheme:dark;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at top,#23395d,#101827 58%);color:#f4f7fb}
+    main{width:min(100%,560px);padding:clamp(24px,6vw,44px);border:1px solid #ffffff22;border-radius:24px;background:#111c2dcc;box-shadow:0 24px 80px #0005;text-align:center}
+    .logo{font-size:13px;letter-spacing:.18em;color:#9db7da;font-weight:800}
+    h1{font-size:clamp(28px,6vw,40px);margin:18px 0 12px}
+    p{color:#c2cde0;line-height:1.6}
+    button{width:100%;margin-top:22px;padding:18px 20px;border:0;border-radius:14px;background:#42d392;color:#062417;font-weight:900;font-size:17px;cursor:pointer}
+    button:disabled{opacity:.55;cursor:wait}
+    .status{min-height:28px;margin-top:18px;font-weight:700}
+    .small{font-size:12px;color:#8fa2bd}
+    .ok{color:#68e6a8}.err{color:#ff9292}
+  </style>
+</head>
+<body>
+  <main>
+    <div class="logo">IUSTIN-DEV · IMMERSIVE CCTV</div>
+    <h1>Confirmă testul</h1>
+    <p>Apasă butonul de mai jos pentru a confirma testul și a permite workflow-ului GitHub Actions să se încheie imediat.</p>
+    <p>Linkul expiră după 5 minute. Dacă nu confirmi la timp, sesiunea se închide automat.</p>
+    <button id="confirm" type="button">✓ CONFIRMĂ TESTUL</button>
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+    <p class="small">Nu reîncărca și nu distribui linkul de confirmare: este unic pentru această sesiune.</p>
+  </main>
+  <script>
+    // After deploying the Cloudflare Worker, replace this placeholder with its /confirm URL.
+    const CONFIRM_ENDPOINT = "https://YOUR-CLOUDFLARE-WORKER.workers.dev/confirm";
+    const params = new URLSearchParams(location.search);
+    const issue = params.get("issue");
+    const token = params.get("token");
+    const button = document.getElementById("confirm");
+    const status = document.getElementById("status");
+
+    if (!issue || !/^\d+$/.test(issue) || !token || !/^[a-f0-9]{64}$/.test(token)) {
+      button.disabled = true;
+      status.className = "status err";
+      status.textContent = "Link invalid sau incomplet. Pornește un test nou din GitHub Actions.";
+    }
+
+    button.addEventListener("click", async () => {
+      if (!issue || !token || button.disabled) return;
+      button.disabled = true;
+      status.className = "status";
+      status.textContent = "Se trimite confirmarea…";
+      try {
+        const response = await fetch(CONFIRM_ENDPOINT, {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({issue, token})
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || "Confirmarea nu a putut fi trimisă.");
+        status.className = "status ok";
+        status.textContent = "Confirmare trimisă! Poți reveni la GitHub Actions. ✅";
+      } catch (error) {
+        button.disabled = false;
+        status.className = "status err";
+        status.textContent = error.message || "Eroare de conexiune. Încearcă din nou.";
+      }
+    });
+  </script>
+</body>
+</html>
