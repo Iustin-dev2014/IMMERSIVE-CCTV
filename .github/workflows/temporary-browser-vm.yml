@@ -79,11 +79,28 @@ jobs:
           echo "Using local ttyd port: ${TTYD_PORT}"
           echo "Using modern UI proxy port: ${VM_UI_PORT}"
 
+          # Treat an intentional Linux shutdown as a normal end to this temporary workspace.
+          export VM_SHUTDOWN_MARKER="$RUNNER_TEMP/vmtest/shutdown-requested"
+          cat > "$RUNNER_TEMP/vmtest/vm-shell.rc" <<'SHELL_RC'
+          shutdown() {
+            printf '\\n[WARNING] Linux session is shutting down. GitHub Actions will close this temporary workspace.\\n'
+            touch "${VM_SHUTDOWN_MARKER}"
+            exit 0
+          }
+          poweroff() { shutdown "$@"; }
+          halt() { shutdown "$@"; }
+          reboot() {
+            printf '\\n[WARNING] Reboot requested. Closing this temporary Linux workspace instead.\\n'
+            touch "${VM_SHUTDOWN_MARKER}"
+            exit 0
+          }
+          SHELL_RC
+
           # Keep ttyd as the terminal engine; the proxy adds the touch-first interface.
           "$TTYD_BIN" --interface 127.0.0.1 --port "$TTYD_PORT" \
             --client-option fontSize=16 \
             --credential "cctvtest:${VM_WEB_PASSWORD}" --writable \
-            bash --noprofile --norc -i \
+            bash --noprofile --rcfile "$RUNNER_TEMP/vmtest/vm-shell.rc" -i \
             > "$RUNNER_TEMP/vmtest/ttyd.log" 2>&1 &
           TTYD_PID=$!
 
@@ -187,5 +204,13 @@ jobs:
           echo "Do not share the URL or password."
           echo "=================================================="
 
-          sleep 300
+          # Poll for a deliberate shutdown request while keeping the five-minute limit.
+          for remaining_seconds in $(seq 1 300); do
+            if [[ -f "$VM_SHUTDOWN_MARKER" ]]; then
+              echo "::warning::Linux was shut down by the user; closing the temporary browser VM workflow normally."
+              echo "The Linux session is closed. This GitHub Actions workspace will now close too."
+              exit 0
+            fi
+            sleep 1
+          done
           echo "Five minutes elapsed. Closing the temporary browser VM now."
