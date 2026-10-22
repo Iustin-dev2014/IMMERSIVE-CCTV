@@ -45,7 +45,7 @@ jobs:
           set -euo pipefail
           nonce="$(openssl rand -hex 32)"
           title="[CCTV TEST CONFIRM] Run ${RUN_ID}"
-          issue_json="$(gh api "repos/${REPOSITORY}/issues" -f title="${title}" -f body="Temporary confirmation session for Actions run ${RUN_ID}. It is permanently deleted when the session ends.")"
+          issue_json="$(gh api "repos/${REPOSITORY}/issues" -f title="${title}" -f body="Temporary confirmation session for Actions run ${RUN_ID}. It is closed when the session ends.")"
           issue_number="$(printf '%s' "${issue_json}" | jq -r '.number')"
           page_url="https://iustin-dev2014.github.io/IMMERSIVE-CCTV/confirm-test/?issue=${issue_number}&token=${nonce}"
           echo "issue_number=${issue_number}" >> "$GITHUB_OUTPUT"
@@ -54,11 +54,11 @@ jobs:
           {
             echo "## Confirm this test in your browser"
             echo
-            echo "Open the page, copy the unique code, then post it as a comment on the temporary issue. The comment must come from **Iustin-dev2014**."
+            echo "Open the page, copy the unique code, then post it as a comment on the temporary issue. Any commenter is allowed; the marker must match exactly."
             echo
             echo "${page_url}"
             echo
-            echo "The session expires after 5 minutes. The temporary issue is permanently deleted afterward."
+            echo "The session expires after 5 minutes. The temporary issue is closed afterward."
           } >> "$GITHUB_STEP_SUMMARY"
           echo "Confirmation page: ${page_url}"
 
