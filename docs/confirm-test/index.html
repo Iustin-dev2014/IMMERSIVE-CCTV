@@ -39,7 +39,11 @@
     const button = document.getElementById("confirm");
     const status = document.getElementById("status");
 
-    if (!issue || !/^\d+$/.test(issue) || !token || !/^[a-f0-9]{64}$/.test(token)) {
+    if (CONFIRM_ENDPOINT.includes("YOUR-CLOUDFLARE-WORKER")) {
+      button.disabled = true;
+      status.className = "status err";
+      status.textContent = "Pagina este publicată, dar endpoint-ul de confirmare nu este configurat încă.";
+    } else if (!issue || !/^\\d+$/.test(issue) || !token || !/^[a-f0-9]{64}$/.test(token)) {
       button.disabled = true;
       status.className = "status err";
       status.textContent = "Link invalid sau incomplet. Pornește un test nou din GitHub Actions.";
