@@ -1,0 +1,85 @@
+name: Web Confirmation Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: web-confirmation-test
+  cancel-in-progress: false
+
+jobs:
+  wait-for-confirmation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Create confirmation session
+        id: session
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          nonce="$(openssl rand -hex 32)"
+          title="[CCTV TEST CONFIRM] Run ${RUN_ID}"
+          issue_url="$(gh api "repos/${REPOSITORY}/issues" -f title="${title}" -f body="Temporary confirmation session for Actions run ${RUN_ID}. This issue is automatically closed when the session finishes.")"
+          issue_number="$(printf '%s' "$issue_url" | jq -r '.number')"
+          page_url="https://iustin-dev2014.github.io/IMMERSIVE-CCTV/confirm-test/?issue=${issue_number}&token=${nonce}"
+          echo "issue_number=${issue_number}" >> "$GITHUB_OUTPUT"
+          echo "nonce=${nonce}" >> "$GITHUB_OUTPUT"
+          echo "page_url=${page_url}" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Confirm this test in your browser"
+            echo
+            echo "**Open this page and press CONFIRM TEST within 5 minutes:**"
+            echo
+            echo "${page_url}"
+            echo
+            echo "The session automatically expires after 5 minutes."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Confirmation page: ${page_url}"
+
+      - name: Wait up to five minutes
+        id: wait
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ steps.session.outputs.issue_number }}
+          NONCE: ${{ steps.session.outputs.nonce }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 300))
+          while (( SECONDS < deadline )); do
+            comments="$(gh api --paginate "repos/${REPOSITORY}/issues/${ISSUE_NUMBER}/comments" --jq '.[].body' 2>/dev/null || true)"
+            if printf '%s\n' "$comments" | grep -Fqx "CCTV_TEST_CONFIRM:${NONCE}"; then
+              echo "confirmed=true" >> "$GITHUB_OUTPUT"
+              echo "Confirmation received from the web page."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "confirmed=false" >> "$GITHUB_OUTPUT"
+          echo "No confirmation received within five minutes; ending the session automatically."
+
+      - name: Close confirmation session
+        if: always() && steps.session.outputs.issue_number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ steps.session.outputs.issue_number }}
+          CONFIRMED: ${{ steps.wait.outputs.confirmed }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${CONFIRMED:-false}" == "true" ]]; then
+            gh api "repos/${REPOSITORY}/issues/${ISSUE_NUMBER}/comments" -f body="✅ Web confirmation received. Session closed."
+          else
+            gh api "repos/${REPOSITORY}/issues/${ISSUE_NUMBER}/comments" -f body="⌛ Session expired: no confirmation received within 5 minutes."
+          fi
+          gh api --method PATCH "repos/${REPOSITORY}/issues/${ISSUE_NUMBER}" -f state=closed >/dev/null
