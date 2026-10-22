@@ -34,7 +34,7 @@
       <button id="copy" type="button">COPIAZĂ CODUL</button>
       <strong>2. Deschide sesiunea GitHub și postează codul ca un comentariu</strong>
       <a id="issue-link" class="link secondary" href="#" target="_blank" rel="noopener noreferrer">DESCHIDE ISSUE-UL TEMPORAR</a>
-      <p class="small">Workflow-ul acceptă doar comentariul exact de la contul GitHub <strong>Iustin-dev2014</strong>. După confirmare sau expirarea celor 5 minute, sesiunea temporară este ștearsă definitiv.</p>
+      <p class="small">Orice cont care poate comenta pe repository poate confirma, dacă publică exact codul unic. Sesiunea expiră după 5 minute; issue-ul va fi închis automat.</p>
     </section>
     <div id="status" class="status" role="status" aria-live="polite"></div>
     <p class="small">IMMERSIVE CCTV · Confirmare prin GitHub Issues și GitHub Actions.</p>
@@ -54,6 +54,27 @@
       const status = document.getElementById("status");
       const value = "CCTV_TEST_CONFIRM:" + nonce;
       function say(message, kind) { status.className = "status " + (kind || ""); status.textContent = message; }
+      let polling = false, confirmed = false;
+      async function pollForConfirmation() {
+        if (polling || confirmed) return;
+        polling = true;
+        try {
+          const response = await fetch("https://api.github.com/repos/" + OWNER + "/" + REPO + "/issues/" + issue + "/comments?per_page=100", { headers: { "Accept": "application/vnd.github+json" }, cache: "no-store" });
+          if (!response.ok) throw new Error("GitHub API HTTP " + response.status);
+          const comments = await response.json();
+          if (comments.some(comment => comment.body === value)) {
+            confirmed = true;
+            say("✅ Confirmare primită! Testul a fost confirmat. Pagina se va închide în 2 secunde.", "ok");
+            document.querySelector(".panel").style.display = "none";
+            copy.disabled = true;
+            window.setTimeout(() => { window.close(); say("Confirmarea a fost înregistrată. Dacă browserul nu permite închiderea automată, închide fila manual.", "ok"); }, 2000);
+            return;
+          }
+          say("Aștept comentariul de confirmare… Verific automat la fiecare 4 secunde.");
+        } catch (error) {
+          say("Nu pot verifica acum comentariile GitHub. Reîncerc automat. (" + error.message + ")", "err");
+        } finally { polling = false; }
+      }
       if (!valid) {
         marker.textContent = "Link invalid";
         copy.disabled = true;
@@ -63,6 +84,8 @@
       }
       marker.textContent = value;
       link.href = "https://github.com/" + OWNER + "/" + REPO + "/issues/" + issue;
+      pollForConfirmation();
+      window.setInterval(() => { if (!document.hidden) pollForConfirmation(); }, 4000);
       copy.addEventListener("click", async () => {
         try {
           await navigator.clipboard.writeText(value);
