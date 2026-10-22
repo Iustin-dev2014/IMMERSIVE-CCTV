@@ -47,7 +47,7 @@
       const params = new URLSearchParams(location.search);
       const issue = params.get("issue") || "";
       const nonce = params.get("token") || "";
-      const valid = /^\\d{1,10}$/.test(issue) && /^[a-f0-9]{64}$/.test(nonce);
+      const valid = /^\d{1,10}$/.test(issue) && /^[a-f0-9]{64}$/.test(nonce);
       const marker = document.getElementById("marker");
       const copy = document.getElementById("copy");
       const link = document.getElementById("issue-link");
