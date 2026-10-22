@@ -1,0 +1,88 @@
+name: Validate temporary VM touch UI
+
+on:
+  pull_request:
+    paths:
+      - ".github/scripts/vm-ui-proxy.cjs"
+      - ".github/workflows/temporary-browser-vm.yml"
+      - ".github/workflows/test-vm-ui.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install terminal and proxy dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y ttyd
+          npm install --prefix "$RUNNER_TEMP/vm-ui-test" --no-save http-proxy@1.18.1
+          node --check .github/scripts/vm-ui-proxy.cjs
+
+      - name: Start local terminal and test injected UI
+        shell: bash
+        env:
+          VM_WEB_PASSWORD: ui-smoke-test-password
+        run: |
+          set -euo pipefail
+          export NODE_PATH="$RUNNER_TEMP/vm-ui-test/node_modules"
+          TTYD_PORT="$(python3 - <<'PY'
+          import socket
+          s = socket.socket()
+          s.bind(("127.0.0.1", 0))
+          print(s.getsockname()[1])
+          s.close()
+          PY
+          )"
+          VM_UI_PORT="$(python3 - <<'PY'
+          import socket
+          s = socket.socket()
+          s.bind(("127.0.0.1", 0))
+          print(s.getsockname()[1])
+          s.close()
+          PY
+          )"
+
+          ttyd --interface 127.0.0.1 --port "$TTYD_PORT" \
+            --client-option fontSize=16 \
+            --credential "cctvtest:${VM_WEB_PASSWORD}" --writable \
+            bash --noprofile --norc -i > "$RUNNER_TEMP/ttyd.log" 2>&1 &
+          TTYD_PID=$!
+          TTYD_PORT="$TTYD_PORT" VM_UI_PORT="$VM_UI_PORT" node .github/scripts/vm-ui-proxy.cjs \
+            > "$RUNNER_TEMP/vm-ui-proxy.log" 2>&1 &
+          PROXY_PID=$!
+
+          cleanup() {
+            kill "$PROXY_PID" "$TTYD_PID" 2>/dev/null || true
+            wait "$PROXY_PID" "$TTYD_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          READY=0
+          for attempt in $(seq 1 20); do
+            if curl --fail --silent --show-error --user "cctvtest:${VM_WEB_PASSWORD}" \
+              "http://127.0.0.1:${VM_UI_PORT}/" -o "$RUNNER_TEMP/vm-ui-check.html" 2>/dev/null \
+              && grep -q "VM CONSOLE" "$RUNNER_TEMP/vm-ui-check.html" \
+              && grep -q "data-chord" "$RUNNER_TEMP/vm-ui-check.html" \
+              && grep -q "vm-terminal-wrap" "$RUNNER_TEMP/vm-ui-check.html"; then
+              READY=1
+              break
+            fi
+            sleep 1
+          done
+
+          if [[ "$READY" -ne 1 ]]; then
+            echo "::error::Touch UI smoke test failed."
+            cat "$RUNNER_TEMP/vm-ui-proxy.log" || true
+            cat "$RUNNER_TEMP/ttyd.log" || true
+            exit 1
+          fi
+          echo "PASS: authenticated terminal page contains the responsive touch UI."
