@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="en">
+<html lang="ro">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#101827">
-  <title>IMMERSIVE CCTV — Confirm test</title>
+  <title>IMMERSIVE CCTV — Confirmă testul</title>
   <style>
     :root{color-scheme:dark;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
     *{box-sizing:border-box}
@@ -13,62 +13,60 @@
     .logo{font-size:13px;letter-spacing:.18em;color:#9db7da;font-weight:800}
     h1{font-size:clamp(28px,6vw,40px);margin:18px 0 12px}
     p{color:#c2cde0;line-height:1.6}
-    button{width:100%;margin-top:22px;padding:18px 20px;border:0;border-radius:14px;background:#42d392;color:#062417;font-weight:900;font-size:17px;cursor:pointer}
+    button,.issue-link{display:block;width:100%;margin-top:22px;padding:18px 20px;border:0;border-radius:14px;background:#42d392;color:#062417;font-weight:900;font-size:17px;text-decoration:none;cursor:pointer}
     button:disabled{opacity:.55;cursor:wait}
-    .status{min-height:28px;margin-top:18px;font-weight:700}
+    .status{min-height:28px;margin-top:18px;font-weight:700;overflow-wrap:anywhere}
     .small{font-size:12px;color:#8fa2bd}
     .ok{color:#68e6a8}.err{color:#ff9292}
+    code{display:block;margin-top:12px;padding:12px;border-radius:10px;background:#080f1b;color:#f4f7fb;overflow-wrap:anywhere;user-select:all}
   </style>
 </head>
 <body>
   <main>
     <div class="logo">IUSTIN-DEV · IMMERSIVE CCTV</div>
     <h1>Confirmă testul</h1>
-    <p>Apasă butonul de mai jos pentru a confirma testul și a permite workflow-ului GitHub Actions să se încheie imediat.</p>
-    <p>Linkul expiră după 5 minute. Dacă nu confirmi la timp, sesiunea se închide automat.</p>
-    <button id="confirm" type="button">✓ CONFIRMĂ TESTUL</button>
+    <p>Apasă butonul pentru a copia codul de confirmare și a deschide issue-ul temporar din GitHub. Apoi lipește codul ca un comentariu și publică-l.</p>
+    <p>Ai 5 minute. Workflow-ul detectează comentariul și se încheie automat; dacă timpul expiră, sesiunea se închide.</p>
+    <button id="confirm" type="button">✓ COPIAZĂ CODUL ȘI DESCHIDE GITHUB</button>
     <div id="status" class="status" role="status" aria-live="polite"></div>
-    <p class="small">Nu reîncărca și nu distribui linkul de confirmare: este unic pentru această sesiune.</p>
+    <code id="marker" hidden></code>
+    <a id="issue-link" class="issue-link" hidden target="_blank" rel="noopener noreferrer">Deschide issue-ul GitHub</a>
+    <p class="small">Nu distribui linkul unic al sesiunii. Confirmarea folosește doar GitHub; pagina aceasta este statică și nu trimite date către servicii externe.</p>
   </main>
   <script>
-    // After deploying the Cloudflare Worker, replace this placeholder with its /confirm URL.
-    const CONFIRM_ENDPOINT = "https://YOUR-CLOUDFLARE-WORKER.workers.dev/confirm";
     const params = new URLSearchParams(location.search);
     const issue = params.get("issue");
     const token = params.get("token");
     const button = document.getElementById("confirm");
     const status = document.getElementById("status");
+    const marker = document.getElementById("marker");
+    const issueLink = document.getElementById("issue-link");
+    const valid = issue && /^\d{1,10}$/.test(issue) && token && /^[a-f0-9]{64}$/.test(token);
+    const confirmation = valid ? "CCTV_TEST_CONFIRM:" + token : "";
+    const issueUrl = valid ? "https://github.com/Iustin-dev2014/IMMERSIVE-CCTV/issues/" + issue : "";
 
-    if (CONFIRM_ENDPOINT.includes("YOUR-CLOUDFLARE-WORKER")) {
-      button.disabled = true;
-      status.className = "status err";
-      status.textContent = "Pagina este publicată, dar endpoint-ul de confirmare nu este configurat încă.";
-    } else if (!issue || !/^\d+$/.test(issue) || !token || !/^[a-f0-9]{64}$/.test(token)) {
+    if (!valid) {
       button.disabled = true;
       status.className = "status err";
       status.textContent = "Link invalid sau incomplet. Pornește un test nou din GitHub Actions.";
     }
 
     button.addEventListener("click", async () => {
-      if (!issue || !token || button.disabled) return;
-      button.disabled = true;
+      if (!valid || button.disabled) return;
+      marker.hidden = false;
+      marker.textContent = confirmation;
+      issueLink.hidden = false;
+      issueLink.href = issueUrl;
       status.className = "status";
-      status.textContent = "Se trimite confirmarea…";
       try {
-        const response = await fetch(CONFIRM_ENDPOINT, {
-          method: "POST",
-          headers: {"Content-Type":"application/json"},
-          body: JSON.stringify({issue, token})
-        });
-        const result = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(result.error || "Confirmarea nu a putut fi trimisă.");
+        await navigator.clipboard.writeText(confirmation);
         status.className = "status ok";
-        status.textContent = "Confirmare trimisă! Poți reveni la GitHub Actions. ✅";
-      } catch (error) {
-        button.disabled = false;
+        status.textContent = "Cod copiat! În issue-ul GitHub care se deschide, lipește codul într-un comentariu și publică-l.";
+      } catch {
         status.className = "status err";
-        status.textContent = error.message || "Eroare de conexiune. Încearcă din nou.";
+        status.textContent = "Copierea automată nu a mers. Selectează și copiază codul afișat, apoi lipește-l ca un comentariu în issue.";
       }
+      window.open(issueUrl, "_blank", "noopener,noreferrer");
     });
   </script>
 </body>
