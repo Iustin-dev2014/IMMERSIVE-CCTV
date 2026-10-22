@@ -67,19 +67,38 @@ jobs:
           PY
           )"
 
-          echo "Using local ttyd port: ${TTYD_PORT}"
+          VM_UI_PORT="$(python3 - <<'PY'
+          import socket
+          s = socket.socket()
+          s.bind(("127.0.0.1", 0))
+          print(s.getsockname()[1])
+          s.close()
+          PY
+          )"
 
-          # Start a clean interactive shell without forcing a minimal environment.
+          echo "Using local ttyd port: ${TTYD_PORT}"
+          echo "Using modern UI proxy port: ${VM_UI_PORT}"
+
+          # Keep ttyd as the terminal engine; the proxy adds the touch-first interface.
           "$TTYD_BIN" --interface 127.0.0.1 --port "$TTYD_PORT" \
+            --client-option fontSize=16 \
             --credential "cctvtest:${VM_WEB_PASSWORD}" --writable \
             bash --noprofile --norc -i \
             > "$RUNNER_TEMP/vmtest/ttyd.log" 2>&1 &
           TTYD_PID=$!
 
+          TTYD_PORT="$TTYD_PORT" VM_UI_PORT="$VM_UI_PORT" node "$GITHUB_WORKSPACE/.github/scripts/vm-ui-proxy.cjs" \
+            > "$RUNNER_TEMP/vmtest/vm-ui-proxy.log" 2>&1 &
+          UI_PROXY_PID=$!
+
           cleanup() {
             if [[ -n "${TUNNEL_PID:-}" ]]; then
               kill "$TUNNEL_PID" 2>/dev/null || true
               wait "$TUNNEL_PID" 2>/dev/null || true
+            fi
+            if [[ -n "${UI_PROXY_PID:-}" ]]; then
+              kill "$UI_PROXY_PID" 2>/dev/null || true
+              wait "$UI_PROXY_PID" 2>/dev/null || true
             fi
             if [[ -n "${TTYD_PID:-}" ]]; then
               kill "$TTYD_PID" 2>/dev/null || true
@@ -92,19 +111,19 @@ jobs:
           # Verify the injected UI is actually served before publishing the tunnel URL.
           UI_READY=0
           for ui_attempt in $(seq 1 20); do
-            if curl --fail --silent --show-error --user "cctvtest:\${VM_WEB_PASSWORD}" \\
-              "http://127.0.0.1:\${VM_UI_PORT}/" -o "\$RUNNER_TEMP/vmtest/ui-check.html" 2>/dev/null \\
-              && grep -q "VM CONSOLE" "\$RUNNER_TEMP/vmtest/ui-check.html" \\
-              && grep -q 'data-chord="ctrl+c"' "\$RUNNER_TEMP/vmtest/ui-check.html"; then
+            if curl --fail --silent --show-error --user "cctvtest:${VM_WEB_PASSWORD}" \
+              "http://127.0.0.1:${VM_UI_PORT}/" -o "$RUNNER_TEMP/vmtest/ui-check.html" 2>/dev/null \
+              && grep -q "VM CONSOLE" "$RUNNER_TEMP/vmtest/ui-check.html" \
+              && grep -q "data-chord" "$RUNNER_TEMP/vmtest/ui-check.html"; then
               UI_READY=1
               break
             fi
             sleep 1
           done
-          if [[ "\$UI_READY" -ne 1 ]]; then
+          if [[ "$UI_READY" -ne 1 ]]; then
             echo "::error::Modern terminal UI failed its local smoke test."
-            cat "\$RUNNER_TEMP/vmtest/vm-ui-proxy.log" || true
-            cat "\$RUNNER_TEMP/vmtest/ttyd.log" || true
+            cat "$RUNNER_TEMP/vmtest/vm-ui-proxy.log" || true
+            cat "$RUNNER_TEMP/vmtest/ttyd.log" || true
             exit 1
           fi
           echo "Modern terminal UI smoke test passed."
@@ -113,7 +132,7 @@ jobs:
           for tunnel_attempt in $(seq 1 5); do
             echo "Starting Cloudflare Quick Tunnel (attempt ${tunnel_attempt}/5)..."
             : > "$RUNNER_TEMP/vmtest/cloudflared.log"
-            "$CLOUDFLARED" tunnel --url "http://127.0.0.1:${TTYD_PORT}" --no-autoupdate > "$RUNNER_TEMP/vmtest/cloudflared.log" 2>&1 &
+            "$CLOUDFLARED" tunnel --url "http://127.0.0.1:${VM_UI_PORT}" --no-autoupdate > "$RUNNER_TEMP/vmtest/cloudflared.log" 2>&1 &
             TUNNEL_PID=$!
 
             for wait_attempt in $(seq 1 25); do
