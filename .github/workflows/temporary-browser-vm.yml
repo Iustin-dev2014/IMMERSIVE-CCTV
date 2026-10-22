@@ -26,13 +26,70 @@ jobs:
             exit 1
           fi
 
-      - name: Download temporary web terminal and tunnel
+      - name: Download pinned tools (with HTTP diagnostics)
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/vmtest"
-          curl -fsSL --retry 3 https://github.com/tsl0922/ttyd/releases/latest/download/ttyd.x86_64 -o "$RUNNER_TEMP/vmtest/ttyd"
-          curl -fsSL --retry 3 https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o "$RUNNER_TEMP/vmtest/cloudflared"
+
+          # Pin exact releases instead of using /releases/latest/download.
+          # ttyd 1.7.7: https://github.com/tsl0922/ttyd/releases/tag/1.7.7
+          # cloudflared 2026.10.1: https://github.com/cloudflare/cloudflared/releases/tag/2026.10.1
+          download_asset() {
+            local label="$1"
+            local url="$2"
+            local destination="$3"
+            local temporary="${destination}.part"
+            local http_status=""
+            local curl_status=0
+
+            echo "::group::Download ${label}"
+            echo "Pinned URL: ${url}"
+            rm -f "$temporary"
+
+            # Do not use curl --fail here: capture the HTTP status explicitly,
+            # so a 404 is reported with the exact URL instead of a generic curl error.
+            set +e
+            http_status="$(curl --silent --show-error --location \
+              --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 120 \
+              --output "$temporary" --write-out '%{http_code}' "$url")"
+            curl_status=$?
+            set -e
+
+            if [[ "$curl_status" -ne 0 || "$http_status" != "200" ]]; then
+              echo "::error title=Asset download failed::${label}: URL=${url} HTTP_STATUS=${http_status:-unknown} CURL_EXIT=${curl_status}"
+              if [[ "$http_status" == "404" ]]; then
+                echo "::error::HTTP 404 means GitHub could not find this exact pinned release asset. Check the tag and filename shown above."
+              elif [[ "$http_status" == "403" ]]; then
+                echo "::error::HTTP 403: access denied or request rate-limited by the hosting service."
+              elif [[ "$http_status" == "000" || -z "$http_status" ]]; then
+                echo "::error::No HTTP response received. Check DNS, network connectivity, TLS, or a temporary GitHub outage."
+              elif [[ "$http_status" =~ ^5 ]]; then
+                echo "::error::The hosting server returned HTTP ${http_status}; this may be a temporary server-side problem."
+              fi
+              if [[ -s "$temporary" ]]; then
+                echo "Response body preview (first 300 bytes; may be an error page):"
+                head -c 300 "$temporary" || true
+                echo
+              fi
+              rm -f "$temporary"
+              echo "::endgroup::"
+              exit 1
+            fi
+
+            mv "$temporary" "$destination"
+            echo "Download OK: ${label} (HTTP ${http_status})"
+            echo "::endgroup::"
+          }
+
+          download_asset "ttyd 1.7.7" \
+            "https://github.com/tsl0922/ttyd/releases/download/1.7.7/ttyd.x86_64" \
+            "$RUNNER_TEMP/vmtest/ttyd"
+
+          download_asset "cloudflared 2026.10.1" \
+            "https://github.com/cloudflare/cloudflared/releases/download/2026.10.1/cloudflared-linux-amd64" \
+            "$RUNNER_TEMP/vmtest/cloudflared"
+
           chmod 700 "$RUNNER_TEMP/vmtest/ttyd" "$RUNNER_TEMP/vmtest/cloudflared"
           "$RUNNER_TEMP/vmtest/ttyd" --version
           "$RUNNER_TEMP/vmtest/cloudflared" --version
@@ -75,7 +132,7 @@ jobs:
           done
 
           if [[ -z "$URL" ]]; then
-            echo "::error::Could not obtain a temporary tunnel URL."
+            echo "::error::Could not obtain a temporary tunnel URL. Cloudflared output follows:"
             cat "$RUNNER_TEMP/vmtest/cloudflared.log"
             exit 1
           fi
