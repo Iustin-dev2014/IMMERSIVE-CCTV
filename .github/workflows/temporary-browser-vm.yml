@@ -37,7 +37,7 @@ concurrency:
 jobs:
   browser-vm:
     name: Start temporary Ubuntu browser session
-    runs-on: ubuntu-24.04
+    runs-on: server hosted
     timeout-minutes: 360
     steps:
       - name: Check out VM UI assets
