@@ -89,8 +89,7 @@ jobs:
               --jq ".artifacts[]? | select(.name == \"${artifact_name}\" and .expired == false) | .id" | head -n 1 || true)"
             if [[ -n "${artifact_id}" ]]; then
               AVAILABLE_RUN_IDS+=("${run_id}")
-              created_at="$(gh run view "${run_id}" --json createdAt --jq '.createdAt' 2>/dev/null || echo unknown)"
-              echo "  run_id=${run_id}  artifact=${artifact_name}  created_at=${created_at}"
+              echo "  run_id=${run_id}  artifact=${artifact_name}"
             fi
           done
 
