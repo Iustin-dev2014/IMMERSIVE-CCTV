@@ -152,69 +152,133 @@ def save():
     print("The custom XOR encoding is obfuscation only; it is not secure encryption.")
 
 def restore():
+    import zlib
+
     if not SAVE_DIR.is_dir():
         print("No 'ubuntu saves' folder found; starting with a clean Ubuntu home.")
         return 0
+
+    shard_dir = SAVE_DIR / "ubuntu-session-save"
     candidates = sorted(p for p in SAVE_DIR.glob("*.zip") if p.is_file())
-    if not candidates:
-        print("No ZIP snapshot in 'ubuntu saves'; starting with a clean Ubuntu home.")
+    has_shards = shard_dir.is_dir() and (shard_dir / "manifest.db").is_file()
+    if len(candidates) + int(has_shards) == 0:
+        print("No ZIP or chunked snapshot in 'ubuntu saves'; starting with a clean Ubuntu home.")
         return 0
-    if len(candidates) != 1:
-        raise ValueError("Expected exactly one *.zip in 'ubuntu saves'; nothing was imported or deleted.")
-    archive = candidates[0]
-    with zipfile.ZipFile(archive, "r") as zf:
-        bad = zf.testzip()
-        if bad:
-            raise ValueError(f"ZIP CRC check failed at {bad!r}; snapshot retained.")
-        names = zf.namelist()
-        if len(names) > 200000:
-            raise ValueError("Snapshot contains too many entries; snapshot retained.")
-        total = sum(info.file_size for info in zf.infolist())
-        if total > MAX_UNPACKED:
-            raise ValueError("Snapshot expands beyond 5 GiB; snapshot retained.")
-        if "manifest.json" not in names:
-            raise ValueError("Missing manifest.json; snapshot retained.")
+    if len(candidates) + int(has_shards) != 1:
+        raise ValueError("Expected exactly one ZIP snapshot or ubuntu-session-save folder; nothing was imported or deleted.")
+
+    verified = {}
+    if has_shards:
+        snapshot_name = shard_dir.name
+        key = b"immersive-cctv-session-v1"
+        magic = b"ICCTV1D"
+
+        def decode_bytes(data):
+            unpacked = bytes(value ^ key[index % len(key)] for index, value in enumerate(data))
+            return zlib.decompress(unpacked)
+
+        raw_index = (shard_dir / "manifest.db").read_bytes()
+        if not raw_index.startswith(b"ICCTVDB1"):
+            raise ValueError("Invalid chunked snapshot index header; snapshot retained.")
         try:
-            manifest = json.loads(zf.read("manifest.json"))
+            manifest = json.loads(decode_bytes(raw_index[len(b"ICCTVDB1"):]))
         except Exception as exc:
-            raise ValueError(f"Invalid manifest JSON ({exc}); snapshot retained.")
-        if manifest.get("format") != "immersive-cctv-ubuntu-session" or manifest.get("version") != VERSION:
-            raise ValueError("Unsupported snapshot format/version; snapshot retained.")
+            raise ValueError(f"Invalid encoded snapshot index ({exc}); snapshot retained.")
+        if manifest.get("format") != "immersive-cctv-chunked-session" or manifest.get("version") != VERSION:
+            raise ValueError("Unsupported chunked snapshot format/version; snapshot retained.")
         snapshot_mode = manifest.get("session_mode")
         requested_mode = os.environ.get("SESSION_MODE", "unknown")
         if snapshot_mode not in {"terminal", "desktop"}:
-            raise ValueError(
-                "Snapshot does not declare a recognized session_mode (terminal/desktop). "
-                "It may be from an older format; ZIP retained. Select the matching mode only "
-                "after creating a snapshot with the updated workflow."
-            )
+            raise ValueError("Chunked snapshot has no recognized session mode; snapshot retained.")
         if requested_mode not in {"terminal", "desktop"}:
             raise ValueError(f"Invalid requested SESSION_MODE {requested_mode!r}; snapshot retained.")
         if snapshot_mode != requested_mode:
             raise ValueError(
-                f"Session mode mismatch: this ZIP was saved from '{snapshot_mode}', but this run "
-                f"selected '{requested_mode}'. Choose '{snapshot_mode}' to restore it, or move "
-                "the ZIP out of 'ubuntu saves' if you intentionally want a clean session. "
-                "The ZIP has NOT been imported or deleted."
+                f"Session mode mismatch: snapshot is '{snapshot_mode}', but this run selected "
+                f"'{requested_mode}'. Select the matching mode. Snapshot retained."
             )
         files = manifest.get("files")
         if not isinstance(files, dict) or manifest.get("file_count") != len(files):
-            raise ValueError("Manifest file list/count mismatch; snapshot retained.")
-        actual = set(names) - {"manifest.json", "SHA256SUMS.txt"}
-        if actual != set(files):
-            raise ValueError("Archive entries do not match manifest; snapshot retained.")
-        verified = {}
+            raise ValueError("Chunked index file list/count mismatch; snapshot retained.")
+        if manifest.get("chunk_count", 0) > 200000:
+            raise ValueError("Chunked snapshot contains too many fragments; snapshot retained.")
         for name, meta in files.items():
             if not safe_member(name) or not (name.startswith("home/") or name == "metadata/apt-manual.txt"):
-                raise ValueError(f"Unsafe or unsupported archive path {name!r}; snapshot retained.")
-            info = zf.getinfo(name)
-            unix_mode = (info.external_attr >> 16) & 0o170000
-            if unix_mode == 0o120000:
-                raise ValueError(f"Symlink entry {name!r} is not allowed; snapshot retained.")
-            data = zf.read(name)
-            if not isinstance(meta, dict) or meta.get("size") != len(data) or meta.get("sha256") != sha256_bytes(data):
+                raise ValueError(f"Unsafe or unsupported logical path {name!r}; snapshot retained.")
+            if not isinstance(meta, dict) or not isinstance(meta.get("chunks"), list):
+                raise ValueError(f"Invalid chunk list for {name!r}; snapshot retained.")
+            pieces = []
+            for chunk_name in meta["chunks"]:
+                chunk_path = PurePosixPath(chunk_name)
+                if not safe_member(chunk_name) or chunk_path.parts[0] != "payload" or len(chunk_path.parts) != 2 or not chunk_name.endswith(".dat"):
+                    raise ValueError(f"Unsafe fragment path {chunk_name!r}; snapshot retained.")
+                part_path = shard_dir / Path(*chunk_path.parts)
+                if not part_path.is_file() or part_path.is_symlink():
+                    raise ValueError(f"Missing/unsafe fragment {chunk_name!r}; snapshot retained.")
+                encoded = part_path.read_bytes()
+                if not encoded.startswith(magic):
+                    raise ValueError(f"Invalid fragment header in {chunk_name!r}; snapshot retained.")
+                try:
+                    pieces.append(decode_bytes(encoded[len(magic):]))
+                except Exception as exc:
+                    raise ValueError(f"Could not decode fragment {chunk_name!r}: {exc}; snapshot retained.")
+            data = b"".join(pieces)
+            if meta.get("size") != len(data) or meta.get("sha256") != sha256_bytes(data):
                 raise ValueError(f"Checksum/size mismatch for {name!r}; snapshot retained.")
             verified[name] = data
+        actual_chunks = {p.relative_to(shard_dir).as_posix() for p in (shard_dir / "payload").glob("*.dat")}
+        listed_chunks = {chunk for meta in files.values() for chunk in meta["chunks"]}
+        if actual_chunks != listed_chunks:
+            raise ValueError("Fragment files do not match the index; snapshot retained.")
+    else:
+        archive = candidates[0]
+        snapshot_name = archive.name
+        with zipfile.ZipFile(archive, "r") as zf:
+            bad = zf.testzip()
+            if bad:
+                raise ValueError(f"ZIP CRC check failed at {bad!r}; snapshot retained.")
+            names = zf.namelist()
+            if len(names) > 200000:
+                raise ValueError("Snapshot contains too many entries; snapshot retained.")
+            total = sum(info.file_size for info in zf.infolist())
+            if total > MAX_UNPACKED:
+                raise ValueError("Snapshot expands beyond 5 GiB; snapshot retained.")
+            if "manifest.json" not in names:
+                raise ValueError("Missing manifest.json; snapshot retained.")
+            try:
+                manifest = json.loads(zf.read("manifest.json"))
+            except Exception as exc:
+                raise ValueError(f"Invalid manifest JSON ({exc}); snapshot retained.")
+            if manifest.get("format") != "immersive-cctv-ubuntu-session" or manifest.get("version") != VERSION:
+                raise ValueError("Unsupported snapshot format/version; snapshot retained.")
+            snapshot_mode = manifest.get("session_mode")
+            requested_mode = os.environ.get("SESSION_MODE", "unknown")
+            if snapshot_mode not in {"terminal", "desktop"}:
+                raise ValueError("Snapshot does not declare a recognized session mode; ZIP retained.")
+            if requested_mode not in {"terminal", "desktop"}:
+                raise ValueError(f"Invalid requested SESSION_MODE {requested_mode!r}; snapshot retained.")
+            if snapshot_mode != requested_mode:
+                raise ValueError(
+                    f"Session mode mismatch: ZIP is '{snapshot_mode}', but this run selected "
+                    f"'{requested_mode}'. Choose the matching mode. ZIP retained."
+                )
+            files = manifest.get("files")
+            if not isinstance(files, dict) or manifest.get("file_count") != len(files):
+                raise ValueError("Manifest file list/count mismatch; snapshot retained.")
+            actual = set(names) - {"manifest.json", "SHA256SUMS.txt"}
+            if actual != set(files):
+                raise ValueError("Archive entries do not match manifest; snapshot retained.")
+            for name, meta in files.items():
+                if not safe_member(name) or not (name.startswith("home/") or name == "metadata/apt-manual.txt"):
+                    raise ValueError(f"Unsafe or unsupported archive path {name!r}; snapshot retained.")
+                info = zf.getinfo(name)
+                unix_mode = (info.external_attr >> 16) & 0o170000
+                if unix_mode == 0o120000:
+                    raise ValueError(f"Symlink entry {name!r} is not allowed; snapshot retained.")
+                data = zf.read(name)
+                if not isinstance(meta, dict) or meta.get("size") != len(data) or meta.get("sha256") != sha256_bytes(data):
+                    raise ValueError(f"Checksum/size mismatch for {name!r}; snapshot retained.")
+                verified[name] = data
 
     package_data = verified.get("metadata/apt-manual.txt", b"").decode("utf-8")
     packages = sorted({line.strip() for line in package_data.splitlines()
@@ -222,7 +286,6 @@ def restore():
     if packages:
         print(f"Restoring {len(packages)} recorded apt packages...")
         subprocess.run(["sudo", "apt-get", "update"], check=True)
-        # Install in batches to avoid command-line length limits.
         for start in range(0, len(packages), 100):
             subprocess.run(["sudo", "apt-get", "install", "-y", "--no-install-recommends", *packages[start:start + 100]], check=True)
 
@@ -238,13 +301,12 @@ def restore():
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(data)
 
-    # Signal the workflow that validation and restore completed; only then may it consume the ZIP.
     output = os.environ.get("GITHUB_OUTPUT")
     if output:
         with open(output, "a", encoding="utf-8") as f:
             f.write("restored=true\n")
-            f.write(f"snapshot_name={archive.name}\n")
-    print(f"Snapshot imported successfully from {archive.name}. The workflow may now remove it from the repository.")
+            f.write(f"snapshot_name={snapshot_name}\n")
+    print(f"Snapshot imported successfully from {snapshot_name}. The workflow may now remove it from the repository.")
     return 0
 
 if __name__ == "__main__":
