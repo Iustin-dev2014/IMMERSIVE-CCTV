@@ -98,7 +98,7 @@ jobs:
           Start-Process -FilePath $env:TVNSERVER -ArgumentList "-run" -RedirectStandardOutput (Join-Path $logDir "vnc-out.log") -RedirectStandardError (Join-Path $logDir "vnc-err.log")
           Start-Sleep -Seconds 5
 
-          $websockify = Start-Process -FilePath "python" -ArgumentList @("-m","websockify","--web=$env:NOVNC_ROOT","127.0.0.1:6080","127.0.0.1:5900") -PassThru -RedirectStandardOutput (Join-Path $logDir "websockify.log") -RedirectStandardError (Join-Path $logDir "websockify-err.log")
+          $websockify = Start-Process -FilePath "python" -ArgumentList @("-m","websockify","--allow-loopback","--web=$env:NOVNC_ROOT","127.0.0.1:6080","127.0.0.1:5900") -PassThru -RedirectStandardOutput (Join-Path $logDir "websockify.log") -RedirectStandardError (Join-Path $logDir "websockify-err.log")
           $env:NODE_PATH = Join-Path $env:RUNNER_TEMP "minecraft-desktop-proxy\node_modules"
           $env:VM_UI_PORT = "8090"
           $proxy = Start-Process -FilePath "node" -ArgumentList @("$env:GITHUB_WORKSPACE/.github/scripts/minecraft-desktop-proxy.cjs") -PassThru -RedirectStandardOutput (Join-Path $logDir "proxy.log") -RedirectStandardError (Join-Path $logDir "proxy-err.log")
