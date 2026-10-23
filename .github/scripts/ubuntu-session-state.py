@@ -15,18 +15,18 @@ ROOT = Path(os.environ.get("GITHUB_WORKSPACE", ".")).resolve()
 SAVE_DIR = ROOT / "ubuntu saves"
 HOME = Path.home()
 MAX_UNPACKED = 5 * 1024 * 1024 * 1024
-EXCLUDED_PARTS = {
+EXCLUDED_PATHS = {
     ".ssh", ".gnupg", ".aws", ".azure", ".kube", ".docker",
     ".local/share/keyrings", ".local/share/Trash", ".config/gh",
-    ".cache", ".npm", ".cargo/registry", ".rustup", ".gradle/caches",
-    ".mozilla", ".config/google-chrome", ".config/chromium",
-    ".thumbnails", ".pytest_cache", ".mypy_cache", ".ruff_cache",
-    ".tox", "__pycache__", "node_modules", ".venv", "venv",
-    ".next", ".turbo",
-}
-EXCLUDED_PREFIXES = {
+    ".cargo/registry", ".gradle/caches", ".mozilla",
+    ".config/google-chrome", ".config/chromium",
     ".config/Code/Cache", ".config/Code/CachedData",
     ".config/Code/Service Worker/CacheStorage",
+}
+EXCLUDED_DIR_NAMES = {
+    ".cache", ".npm", ".rustup", ".thumbnails",
+    ".pytest_cache", ".mypy_cache", ".ruff_cache", ".tox",
+    "__pycache__", "node_modules", ".venv", "venv", ".next", ".turbo",
 }
 PACKAGE_RE = re.compile(r"^[a-z0-9][a-z0-9+.-]*$")
 
@@ -37,10 +37,10 @@ def safe_member(name):
 def excluded(rel):
     parts = rel.parts
     value = rel.as_posix()
-    # Exclude regenerable cache/dependency directories anywhere in HOME.
-    if any(part in EXCLUDED_PARTS for part in parts):
+    # Exclude sensitive/root-level paths and regenerable folders anywhere in HOME.
+    if any(value == item or value.startswith(item + "/") for item in EXCLUDED_PATHS):
         return True
-    return any(value == item or value.startswith(item + "/") for item in EXCLUDED_PREFIXES)
+    return any(part in EXCLUDED_DIR_NAMES for part in parts)
 
 def sha256_bytes(data):
     return hashlib.sha256(data).hexdigest()
