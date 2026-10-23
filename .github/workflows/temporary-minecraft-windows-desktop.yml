@@ -127,19 +127,24 @@ jobs:
             throw "The cloudflared download looks invalid."
           }
 
-          $tunnelLog = Join-Path $logDir "cloudflared.log"
-          $tunnel = Start-Process -FilePath $cloudflared -ArgumentList @("tunnel","--url","http://127.0.0.1:8090","--no-autoupdate") -PassThru -RedirectStandardOutput $tunnelLog -RedirectStandardError $tunnelLog
+          $tunnelOut = Join-Path $logDir "cloudflared-out.log"
+          $tunnelErr = Join-Path $logDir "cloudflared-err.log"
+          $tunnel = Start-Process -FilePath $cloudflared -ArgumentList @("tunnel","--url","http://127.0.0.1:8090","--no-autoupdate") -PassThru -RedirectStandardOutput $tunnelOut -RedirectStandardError $tunnelErr
           $url = $null
           for ($i = 0; $i -lt 90; $i++) {
             Start-Sleep -Seconds 1
-            if (Test-Path $tunnelLog) {
-              $match = Select-String -Path $tunnelLog -Pattern "https://[a-zA-Z0-9-]+\.trycloudflare\.com" | Select-Object -First 1
-              if ($match) { $url = $match.Matches[0].Value; break }
+            foreach ($log in @($tunnelOut, $tunnelErr)) {
+              if (Test-Path $log) {
+                $match = Select-String -Path $log -Pattern "https://[a-zA-Z0-9-]+\.trycloudflare\.com" | Select-Object -First 1
+                if ($match) { $url = $match.Matches[0].Value; break }
+              }
             }
+            if ($url) { break }
             if ($tunnel.HasExited) { break }
           }
           if (!$url) {
-            Get-Content $tunnelLog -ErrorAction SilentlyContinue
+            Get-Content $tunnelOut -ErrorAction SilentlyContinue
+            Get-Content $tunnelErr -ErrorAction SilentlyContinue
             throw "Could not create the temporary browser desktop tunnel."
           }
 
