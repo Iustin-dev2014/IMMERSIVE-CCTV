@@ -140,7 +140,18 @@ jobs:
             x11vnc -storepasswd "${VM_WEB_PASSWORD:0:8}" "$RUNNER_TEMP/vmtest/x11vnc.pass" >/dev/null
             x11vnc -display :99 -rfbauth "$RUNNER_TEMP/vmtest/x11vnc.pass" -forever -shared -rfbport 5900 -localhost > "$RUNNER_TEMP/vmtest/x11vnc.log" 2>&1 &
             VNC_PID=$!
-            websockify --web=/usr/share/novnc/ 6080 localhost:5900 > "$RUNNER_TEMP/vmtest/websockify.log" 2>&1 &
+            # Debian/Ubuntu's noVNC package may not ship an index.html, which causes
+            # websockify to expose a directory listing at /. Build a tiny landing page
+            # that opens the actual noVNC client instead, while preserving all assets.
+            NOVNC_WEB="$RUNNER_TEMP/vmtest/novnc-web"
+            mkdir -p "$NOVNC_WEB"
+            cp -a /usr/share/novnc/. "$NOVNC_WEB/"
+            cat > "$NOVNC_WEB/index.html" <<'NOVNC_INDEX'
+          <!doctype html>
+          <html lang="en"><head><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=/vnc.html?autoconnect=true&resize=remote"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Ubuntu Desktop</title></head>
+          <body style="font-family:system-ui,sans-serif;background:#111827;color:#f9fafb;display:grid;place-items:center;min-height:90vh"><main><h2>Opening Ubuntu Desktop…</h2><p>If the desktop does not open automatically, <a style="color:#93c5fd" href="/vnc.html?autoconnect=true&resize=remote">tap here to connect</a>.</p></main><script>location.replace('/vnc.html?autoconnect=true&resize=remote');</script></body></html>
+          NOVNC_INDEX
+            websockify --web="$NOVNC_WEB" 6080 localhost:5900 > "$RUNNER_TEMP/vmtest/websockify.log" 2>&1 &
             WEB_PID=$!
             TARGET_PORT=6080
             echo "XFCE desktop started. The noVNC browser client will request the VNC password."
@@ -234,7 +245,7 @@ jobs:
           echo "=================================================="
           if [[ "$SESSION_MODE" == "desktop" ]]; then
             echo "TEMPORARY UBUNTU XFCE DESKTOP IS READY"
-            echo "Open this URL. Enter the first 8 characters of VM_WEB_PASSWORD in the VNC password prompt."
+            echo "Open this URL (it redirects to /vnc.html). Enter the first 8 characters of VM_WEB_PASSWORD in the VNC password prompt."
             echo "XFCE starts with a terminal open; use extend <minutes> (1-300)."
           else
             echo "TEMPORARY UBUNTU BROWSER TERMINAL IS READY"
