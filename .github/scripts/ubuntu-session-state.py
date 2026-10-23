@@ -46,69 +46,110 @@ def sha256_bytes(data):
     return hashlib.sha256(data).hexdigest()
 
 def save():
-    SAVE_DIR.mkdir(parents=True, exist_ok=True)
-    out = ROOT / "ubuntu-session-save.zip"
+    """Write a directory of small, custom-encoded chunks instead of a nested ZIP."""
+    import zlib
+
+    out_dir = ROOT / "ubuntu-session-save"
+    if out_dir.exists():
+        shutil.rmtree(out_dir)
+    payload_dir = out_dir / "payload"
+    payload_dir.mkdir(parents=True, exist_ok=True)
+
+    # This is a format/obfuscation key, not cryptographic protection.
+    # The matching decoder is deliberately kept in this workflow helper.
+    key = b"immersive-cctv-session-v1"
+    magic = b"ICCTV1D"
+    chunk_bytes = 1024 * 1024
+    next_chunk = 0
+    entries = {}
+
+    def encode_bytes(data):
+        packed = zlib.compress(data, level=6)
+        return bytes(value ^ key[index % len(key)] for index, value in enumerate(packed))
+
+    def store_logical_file(logical_name, data):
+        nonlocal next_chunk
+        chunk_names = []
+        for offset in range(0, len(data), chunk_bytes):
+            part = data[offset:offset + chunk_bytes]
+            encoded = magic + encode_bytes(part)
+            chunk_name = f"payload/part-{next_chunk:08d}.dat"
+            (out_dir / chunk_name).write_bytes(encoded)
+            chunk_names.append(chunk_name)
+            next_chunk += 1
+        if not data:
+            chunk_name = f"payload/part-{next_chunk:08d}.dat"
+            (out_dir / chunk_name).write_bytes(magic + encode_bytes(b""))
+            chunk_names.append(chunk_name)
+            next_chunk += 1
+        entries[logical_name] = {
+            "sha256": sha256_bytes(data),
+            "size": len(data),
+            "chunks": chunk_names,
+        }
+
     package_result = subprocess.run(
         ["bash", "-lc", "apt-mark showmanual"],
         text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False
     )
     packages = sorted({line.strip() for line in package_result.stdout.splitlines()
                        if PACKAGE_RE.fullmatch(line.strip())})
-    entries = {}
-    with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
-        for base, dirs, files in os.walk(HOME, followlinks=False):
-            base_path = Path(base)
-            rel_base = base_path.relative_to(HOME)
-            dirs[:] = sorted(d for d in dirs
-                             if not (rel_base / d).is_symlink()
-                             and not excluded(rel_base / d))
-            for filename in sorted(files):
-                source = base_path / filename
-                rel = source.relative_to(HOME)
-                if excluded(rel) or source.is_symlink() or not source.is_file():
-                    continue
-                arcname = "home/" + rel.as_posix()
-                try:
-                    data = source.read_bytes()
-                    zf.writestr(arcname, data)
-                    entries[arcname] = {"sha256": sha256_bytes(data), "size": len(data)}
-                except (OSError, PermissionError) as exc:
-                    print(f"Skipping unreadable file {rel}: {exc}", file=sys.stderr)
-        package_data = ("\n".join(packages) + "\n").encode()
-        zf.writestr("metadata/apt-manual.txt", package_data)
-        entries["metadata/apt-manual.txt"] = {
-            "sha256": sha256_bytes(package_data), "size": len(package_data)
-        }
-        manifest = {
-            "format": "immersive-cctv-ubuntu-session",
-            "version": VERSION,
-            "session_mode": os.environ.get("SESSION_MODE", "unknown"),
-            "created_utc": subprocess.run(
-                ["date", "-u", "+%Y-%m-%dT%H:%M:%SZ"],
-                text=True, stdout=subprocess.PIPE, check=True
-            ).stdout.strip(),
-            "home_directory": str(HOME),
-            "file_count": len(entries),
-            "files": entries,
-            "notes": "Preserves original file formats and settings. System packages are recorded by apt package name."
-        }
-        zf.writestr("manifest.json", json.dumps(manifest, indent=2, sort_keys=True) + "\n")
-        zf.writestr("SHA256SUMS.txt", "".join(
-            f"{item['sha256']}  {name}\n" for name, item in sorted(entries.items())
-        ))
-    size_bytes = out.stat().st_size
-    print(f"Snapshot created: {out} ({size_bytes:,} bytes; {len(entries)} files)")
-    print(f"Snapshot size: {size_bytes / (1024 ** 2):.1f} MiB ({size_bytes / (1000 ** 2):.1f} MB)")
+
+    for base, dirs, files in os.walk(HOME, followlinks=False):
+        base_path = Path(base)
+        rel_base = base_path.relative_to(HOME)
+        dirs[:] = sorted(d for d in dirs
+                         if not (rel_base / d).is_symlink()
+                         and not excluded(rel_base / d))
+        for filename in sorted(files):
+            source = base_path / filename
+            rel = source.relative_to(HOME)
+            if excluded(rel) or source.is_symlink() or not source.is_file():
+                continue
+            try:
+                store_logical_file("home/" + rel.as_posix(), source.read_bytes())
+            except OSError as exc:
+                print(f"Skipping unreadable file {rel}: {exc}", file=sys.stderr)
+
+    package_data = ("\n".join(packages) + "\n").encode()
+    store_logical_file("metadata/apt-manual.txt", package_data)
+
+    manifest = {
+        "format": "immersive-cctv-chunked-session",
+        "version": VERSION,
+        "codec": "ICCTV1D + repeating-key XOR + zlib",
+        "session_mode": os.environ.get("SESSION_MODE", "unknown"),
+        "created_utc": subprocess.run(
+            ["date", "-u", "+%Y-%m-%dT%H:%M:%SZ"],
+            text=True, stdout=subprocess.PIPE, check=True
+        ).stdout.strip(),
+        "home_directory": str(HOME),
+        "file_count": len(entries),
+        "chunk_count": next_chunk,
+        "files": entries,
+        "notes": "Original files are split into small encoded .dat pieces; manifest.db is the decoder index."
+    }
+    manifest_data = json.dumps(manifest, separators=(",", ":"), sort_keys=True).encode()
+    (out_dir / "manifest.db").write_bytes(b"ICCTVDB1" + encode_bytes(manifest_data))
+    (out_dir / "format.info").write_text(
+        "ICCTV-SESSION-CHUNKS\nformat=ICCTV1D\nversion=1\nindex=manifest.db\npayload=payload/*.dat\n",
+        encoding="utf-8"
+    )
+
+    total_bytes = sum(p.stat().st_size for p in out_dir.rglob("*") if p.is_file())
+    print(f"Snapshot directory created: {out_dir}")
+    print(f"Encoded fragments: {next_chunk}; logical files: {len(entries)}")
+    print(f"Artifact payload size: {total_bytes:,} bytes ({total_bytes / (1024 ** 2):.1f} MiB)")
     largest = sorted(
         ((meta["size"], name) for name, meta in entries.items() if name.startswith("home/")),
         reverse=True
     )[:20]
     if largest:
-        print("Largest included files (uncompressed sizes):")
+        print("Largest included files (original sizes):")
         for size, name in largest:
             print(f"  {size / (1024 ** 2):8.1f} MiB  {name}")
-    print("Excluded regenerable caches, dependency folders, temporary Python environments, and Trash.")
-    print("User project source files, documents, and ordinary settings remain included.")
+    print("No nested ZIP is created. GitHub will package this folder as the downloadable artifact.")
+    print("The custom XOR encoding is obfuscation only; it is not secure encryption.")
 
 def restore():
     if not SAVE_DIR.is_dir():
