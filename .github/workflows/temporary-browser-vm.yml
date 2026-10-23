@@ -37,7 +37,9 @@ concurrency:
 jobs:
   browser-vm:
     name: Start temporary Ubuntu browser session
-    runs-on: self-hosted
+    # Requires a GitHub Actions runner installed and started inside Ubuntu on WSL2.
+    # The Windows run.cmd runner must not pick up this Linux-only job.
+    runs-on: [self-hosted, linux, wsl-ubuntu]
     timeout-minutes: 360
     steps:
       - name: Check out VM UI assets
@@ -167,7 +169,7 @@ jobs:
           fi
           mkdir -p "$RUNNER_TEMP/vmtest"
           curl --fail --silent --show-error --location \
-            "https://github.com/cloudflare/cloudflared/releases/download/2026.10.1/cloudflared-linux-amd64" \
+            "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64" \
             -o "$RUNNER_TEMP/vmtest/cloudflared"
           chmod 700 "$RUNNER_TEMP/vmtest/cloudflared"
           "$RUNNER_TEMP/vmtest/cloudflared" --version
