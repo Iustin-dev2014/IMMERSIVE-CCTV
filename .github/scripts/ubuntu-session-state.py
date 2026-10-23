@@ -142,7 +142,7 @@ def save():
     manifest_data = json.dumps(manifest, separators=(",", ":"), sort_keys=True).encode()
     (out_dir / "manifest.db").write_bytes(b"ICCTVDB2" + encode_bytes(manifest_data))
     (out_dir / "format.info").write_text(
-        "ICCTV-SESSION-CHUNKS\nformat=ICCTV1D\nversion=1\nindex=manifest.db\npayload=payload/*.dat\n",
+        "ICCTV-SESSION-CHUNKS\nformat=ICCTV2D\nversion=2\ncodec=zlib-level-1\nindex=manifest.db\npayload=payload/*.dat\n",
         encoding="utf-8"
     )
 
