@@ -46,6 +46,8 @@ jobs:
       - name: Validate and restore saved Ubuntu session (if present)
         id: restore
         shell: bash
+        env:
+          SESSION_MODE: ${{ inputs.session_mode }}
         run: |
           set -euo pipefail
           python3 .github/scripts/ubuntu-session-state.py restore
@@ -81,6 +83,7 @@ jobs:
           set -euo pipefail
           CLOUDFLARED="$RUNNER_TEMP/vmtest/cloudflared"
           export VM_SHUTDOWN_MARKER="$RUNNER_TEMP/vmtest/shutdown-requested"
+          export VM_NO_SAVE_MARKER="$RUNNER_TEMP/vmtest/no-save-requested"
           EXTEND_FIFO="$RUNNER_TEMP/vmtest/extend.fifo"
           mkfifo "$EXTEND_FIFO"
           export VM_EXTEND_FIFO="$EXTEND_FIFO"
@@ -104,6 +107,16 @@ jobs:
             printf '\n[WARNING] Ubuntu is shutting down. GitHub Actions will close this temporary session normally.\n'
             touch "$VM_SHUTDOWN_MARKER"
             exit 0
+          }
+          nosave() {
+            if [[ "$#" -eq 1 && "${1:-}" == "-yes" ]]; then
+              printf '\n[NO-SAVE] Explicitly requested. This session will close without creating or uploading a new snapshot.\n'
+              touch "$VM_NO_SAVE_MARKER"
+              touch "$VM_SHUTDOWN_MARKER"
+              exit 0
+            fi
+            echo "Usage: nosave -yes  (close this session without creating a new snapshot)"
+            return 2
           }
           poweroff() { shutdown "$@"; }
           halt() { shutdown "$@"; }
@@ -268,6 +281,12 @@ jobs:
 
           remaining=120
           while (( remaining > 0 )); do
+            if [[ -f "$VM_NO_SAVE_MARKER" ]]; then
+              echo "no_save=true" >> "$GITHUB_OUTPUT"
+              echo "::notice::nosave -yes was received. The session will close without creating or uploading a new snapshot."
+              echo "Ubuntu session closed without saving."
+              exit 0
+            fi
             if [[ -f "$VM_SHUTDOWN_MARKER" ]]; then
               echo "::warning::Ubuntu shutdown was requested intentionally; closing the temporary workspace normally."
               echo "Ubuntu session closed. GitHub Actions job will now finish successfully."
@@ -330,8 +349,10 @@ jobs:
 
       - name: Create Ubuntu session snapshot ZIP
         id: save_snapshot
-        if: always() && steps.session.outcome == 'success'
+        if: always() && steps.session.outcome == 'success' && steps.session.outputs.no_save != 'true'
         shell: bash
+        env:
+          SESSION_MODE: ${{ inputs.session_mode }}
         run: |
           set -euo pipefail
           python3 .github/scripts/ubuntu-session-state.py save
