@@ -1,0 +1,143 @@
+name: TEMP - Build IMMERSIVE CCTV on Windows Runner
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_mode:
+        description: "How hard should the temporary build test run?"
+        type: choice
+        required: true
+        default: full
+        options:
+          - quick
+          - full
+
+permissions:
+  contents: read
+
+concurrency:
+  group: temporary-immersive-cctv-build
+  cancel-in-progress: false
+
+jobs:
+  build-mod:
+    name: Compile IMMERSIVE CCTV (Windows self-hosted)
+    # Deliberately targets the existing Windows runner only. No Linux/WSL runner is needed.
+    runs-on: [self-hosted, windows]
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout the mod source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Confirm Windows runner and Java
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          if ($env:RUNNER_OS -ne "Windows") {
+            throw "This temporary build workflow must run on the existing Windows self-hosted runner."
+          }
+          Write-Host "Runner OS: $env:RUNNER_OS"
+          java -version
+          if (-not (Test-Path "build.gradle")) {
+            throw "build.gradle was not found at the repository root."
+          }
+          Write-Host "Found build.gradle. Project version and Forge dependencies:"
+          Select-String -Path "build.gradle" -Pattern "version\s*=|net\.minecraftforge:forge"
+
+      - name: Install a temporary Gradle distribution if needed
+        id: gradle
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $gradleVersion = "8.8"
+          $gradleCommand = Get-Command gradle -ErrorAction SilentlyContinue
+          if ($gradleCommand) {
+            $versionText = (& gradle --version 2>&1 | Out-String)
+            Write-Host $versionText
+            if ($versionText -match "Gradle $gradleVersion") {
+              "gradle_executable=gradle" >> $env:GITHUB_OUTPUT
+              exit 0
+            }
+          }
+
+          $installRoot = Join-Path $env:RUNNER_TEMP "immersive-cctv-gradle"
+          $zipPath = Join-Path $env:RUNNER_TEMP "gradle-$gradleVersion-bin.zip"
+          $gradleHome = Join-Path $installRoot "gradle-$gradleVersion"
+          New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
+          if (-not (Test-Path (Join-Path $gradleHome "bin\gradle.bat"))) {
+            Write-Host "Downloading official Gradle $gradleVersion distribution..."
+            Invoke-WebRequest -Uri "https://services.gradle.org/distributions/gradle-$gradleVersion-bin.zip" -OutFile $zipPath
+            Expand-Archive -Path $zipPath -DestinationPath $installRoot -Force
+          }
+          $gradleBat = Join-Path $gradleHome "bin\gradle.bat"
+          if (-not (Test-Path $gradleBat)) {
+            throw "Could not find gradle.bat after extracting the Gradle distribution."
+          }
+          "gradle_executable=$gradleBat" >> $env:GITHUB_OUTPUT
+          & $gradleBat --version
+
+      - name: Build mod JAR
+        shell: pwsh
+        env:
+          BUILD_MODE: ${{ inputs.build_mode }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $gradle = "${{ steps.gradle.outputs.gradle_executable }}"
+          if ([string]::IsNullOrWhiteSpace($gradle)) { throw "Gradle executable output is empty." }
+
+          $arguments = @("--no-daemon", "--stacktrace", "clean", "build")
+          if ($env:BUILD_MODE -eq "full") {
+            $arguments = @("--no-daemon", "--stacktrace", "--warning-mode", "all", "clean", "build")
+          }
+          Write-Host "Build mode: $env:BUILD_MODE"
+          Write-Host "Running Gradle: $gradle $($arguments -join ' ')"
+          & $gradle @arguments
+          if ($LASTEXITCODE -ne 0) {
+            throw "Gradle build failed with exit code $LASTEXITCODE."
+          }
+
+      - name: Verify output JAR and print build summary
+        id: verify
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $jars = @(Get-ChildItem -Path "build\libs" -Filter "*.jar" -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -notmatch "-sources|-javadoc" })
+          if ($jars.Count -eq 0) {
+            throw "Gradle reported success, but no mod JAR was found in build\libs."
+          }
+          Write-Host "Build output(s):"
+          $jars | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash
+            Write-Host ("{0} | {1:N2} MB | SHA256 {2}" -f $_.FullName, ($_.Length / 1MB), $hash)
+          }
+          "jar_count=$($jars.Count)" >> $env:GITHUB_OUTPUT
+          "jar_names=$((($jars | ForEach-Object { $_.Name }) -join ', '))" >> $env:GITHUB_OUTPUT
+
+      - name: Upload compiled mod JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: immersive-cctv-windows-build-${{ github.run_number }}
+          path: build/libs/*.jar
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Report result
+        if: always()
+        shell: pwsh
+        env:
+          BUILD_OUTCOME: ${{ job.status }}
+          JAR_NAMES: ${{ steps.verify.outputs.jar_names }}
+        run: |
+          Write-Host "=============================================="
+          Write-Host "IMMERSIVE CCTV Windows build status: $env:BUILD_OUTCOME"
+          if ($env:JAR_NAMES) { Write-Host "JAR(s): $env:JAR_NAMES" }
+          Write-Host "When successful, download the artifact named immersive-cctv-windows-build-${{ github.run_number }} from this workflow run."
+          Write-Host "=============================================="
