@@ -1,7 +1,16 @@
-name: Temporary Browser VM (2 minutes + touch controls + extend)
+name: Temporary Browser VM (terminal or XFCE desktop)
 
 on:
   workflow_dispatch:
+    inputs:
+      session_mode:
+        description: "Choose the Ubuntu session to open in your browser"
+        type: choice
+        required: true
+        default: terminal
+        options:
+          - terminal
+          - desktop
 
 permissions:
   contents: read
@@ -12,7 +21,7 @@ concurrency:
 
 jobs:
   browser-vm:
-    name: Start temporary browser terminal
+    name: Start temporary Ubuntu browser session
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     steps:
@@ -28,63 +37,47 @@ jobs:
             echo "::error::Missing repository secret VM_WEB_PASSWORD. Add it in Settings > Secrets and variables > Actions."
             exit 1
           fi
+          if [[ "${{ github.event.inputs.session_mode }}" == "desktop" && ${#VM_WEB_PASSWORD} -lt 8 ]]; then
+            echo "::error::For Desktop XFCE, VM_WEB_PASSWORD must contain at least 8 characters (VNC uses the first 8)."
+            exit 1
+          fi
 
-      - name: Install browser terminal and tunnel tools
+      - name: Install session and tunnel tools
         shell: bash
+        env:
+          SESSION_MODE: ${{ inputs.session_mode }}
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y ttyd
+          if [[ "${SESSION_MODE}" == "desktop" ]]; then
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y xvfb xfce4 xfce4-terminal dbus-x11 x11vnc novnc websockify xterm
+          else
+            sudo apt-get install -y ttyd
+            npm install --prefix "$RUNNER_TEMP/vmtest/proxy" --no-save http-proxy@1.18.1
+          fi
           mkdir -p "$RUNNER_TEMP/vmtest"
-          npm install --prefix "$RUNNER_TEMP/vmtest/proxy" --no-save http-proxy@1.18.1
           curl --fail --silent --show-error --location \
             "https://github.com/cloudflare/cloudflared/releases/download/2026.10.1/cloudflared-linux-amd64" \
             -o "$RUNNER_TEMP/vmtest/cloudflared"
           chmod 700 "$RUNNER_TEMP/vmtest/cloudflared"
-
-          command -v ttyd
-          ttyd --version
           "$RUNNER_TEMP/vmtest/cloudflared" --version
+          echo "Selected session mode: ${SESSION_MODE}"
 
-      - name: Start protected terminal and temporary public tunnel
+      - name: Start protected Ubuntu session and temporary public tunnel
         shell: bash
         env:
           VM_WEB_PASSWORD: ${{ secrets.VM_WEB_PASSWORD }}
+          SESSION_MODE: ${{ inputs.session_mode }}
         run: |
           set -euo pipefail
-
-          TTYD_BIN="$(command -v ttyd)"
           CLOUDFLARED="$RUNNER_TEMP/vmtest/cloudflared"
-          export NODE_PATH="$RUNNER_TEMP/vmtest/proxy/node_modules"
-
-          # Pick a free local port instead of assuming 7681 is always available.
-          TTYD_PORT="$(python3 - <<'PY'
-          import socket
-          s = socket.socket()
-          s.bind(("127.0.0.1", 0))
-          print(s.getsockname()[1])
-          s.close()
-          PY
-          )"
-
-          VM_UI_PORT="$(python3 - <<'PY'
-          import socket
-          s = socket.socket()
-          s.bind(("127.0.0.1", 0))
-          print(s.getsockname()[1])
-          s.close()
-          PY
-          )"
-
-          echo "Using local ttyd port: ${TTYD_PORT}"
-          echo "Using modern UI proxy port: ${VM_UI_PORT}"
-
-          # Treat an intentional Linux shutdown as a normal end to this temporary workspace.
           export VM_SHUTDOWN_MARKER="$RUNNER_TEMP/vmtest/shutdown-requested"
           EXTEND_FIFO="$RUNNER_TEMP/vmtest/extend.fifo"
           mkfifo "$EXTEND_FIFO"
           export VM_EXTEND_FIFO="$EXTEND_FIFO"
-          cat > "$RUNNER_TEMP/vmtest/vm-shell.rc" <<'SHELL_RC'
+          exec 9<> "$EXTEND_FIFO"
+
+          cat > "$RUNNER_TEMP/vmtest/session-shell.rc" <<'SHELL_RC'
           export PS1='[user]@immersive-cctv! '
           extend() {
             if [[ "${1:-}" == "" || ! "${1:-}" =~ ^[0-9]+$ ]]; then
@@ -98,17 +91,16 @@ jobs:
             printf '%s\n' "${1}" > "$VM_EXTEND_FIFO"
             echo "Extension request sent to workflow: +${1} minute(s)."
           }
-          echo "Initial session: 2 minutes. Use: extend <minutes> (1-300)"
           shutdown() {
-            printf '\n[WARNING] Linux session is shutting down. GitHub Actions will close this temporary workspace.\n'
-            touch "${VM_SHUTDOWN_MARKER}"
+            printf '\n[WARNING] Ubuntu is shutting down. GitHub Actions will close this temporary session normally.\n'
+            touch "$VM_SHUTDOWN_MARKER"
             exit 0
           }
           poweroff() { shutdown "$@"; }
           halt() { shutdown "$@"; }
           reboot() {
-            printf '\n[WARNING] Reboot requested. Closing this temporary Linux workspace instead.\n'
-            touch "${VM_SHUTDOWN_MARKER}"
+            printf '\n[WARNING] Reboot requested; closing this temporary Ubuntu session instead.\n'
+            touch "$VM_SHUTDOWN_MARKER"
             exit 0
           }
           sudo() {
@@ -120,130 +112,166 @@ jobs:
             done
             command sudo "$@"
           }
+          echo "Temporary session: 2 minutes. Type: extend <minutes> (1-300)"
           SHELL_RC
-          exec 9<> "$EXTEND_FIFO"
 
-          # Keep ttyd as the terminal engine; the proxy adds the touch-first interface.
-          "$TTYD_BIN" --interface 127.0.0.1 --port "$TTYD_PORT" \
-            --client-option fontSize=16 \
-            --credential "cctvtest:${VM_WEB_PASSWORD}" --writable \
-            bash --noprofile --rcfile "$RUNNER_TEMP/vmtest/vm-shell.rc" -i \
-            > "$RUNNER_TEMP/vmtest/ttyd.log" 2>&1 &
-          TTYD_PID=$!
-
-          TTYD_PORT="$TTYD_PORT" VM_UI_PORT="$VM_UI_PORT" node "$GITHUB_WORKSPACE/.github/scripts/vm-ui-proxy.cjs" \
-            > "$RUNNER_TEMP/vmtest/vm-ui-proxy.log" 2>&1 &
-          UI_PROXY_PID=$!
+          if [[ "$SESSION_MODE" == "desktop" ]]; then
+            echo "Starting XFCE desktop in a virtual X display..."
+            sudo install -m 0644 "$RUNNER_TEMP/vmtest/session-shell.rc" /etc/immersive-vm-shell.rc
+            sudo tee /etc/profile.d/immersive-vm-session.sh >/dev/null <<'PROFILE'
+          export VM_SHUTDOWN_MARKER="$RUNNER_TEMP/vmtest/shutdown-requested"
+          export VM_EXTEND_FIFO="$RUNNER_TEMP/vmtest/extend.fifo"
+          PROFILE
+            # Ensure every new interactive Bash terminal has the extension/shutdown commands.
+            sudo tee /etc/bash.bashrc.d-immersive-vm >/dev/null < "$RUNNER_TEMP/vmtest/session-shell.rc"
+            sudo mkdir -p /etc/bash.bashrc.d
+            sudo mv /etc/bash.bashrc.d-immersive-vm /etc/bash.bashrc.d/immersive-vm
+            sudo tee -a /etc/bash.bashrc >/dev/null <<'BASHRC'
+          if [[ -r /etc/bash.bashrc.d/immersive-vm ]]; then
+            source /etc/bash.bashrc.d/immersive-vm
+          fi
+          BASHRC
+            export DISPLAY=:99
+            Xvfb :99 -screen 0 1280x800x24 -ac > "$RUNNER_TEMP/vmtest/xvfb.log" 2>&1 &
+            DISPLAY_PID=$!
+            sleep 2
+            dbus-run-session -- startxfce4 > "$RUNNER_TEMP/vmtest/xfce.log" 2>&1 &
+            XFCE_PID=$!
+            sleep 5
+            # Open a terminal immediately so the extend command is visible and ready to use.
+            DISPLAY=:99 xfce4-terminal --disable-server --command "bash --rcfile /etc/immersive-vm-shell.rc -i" > "$RUNNER_TEMP/vmtest/xfce-terminal.log" 2>&1 &
+            XTERM_PID=$!
+            VNC_PASS_FILE="$RUNNER_TEMP/vmtest/vnc.pass"
+            printf '%s' "${VM_WEB_PASSWORD:0:8}" > "$VNC_PASS_FILE"
+            x11vnc -storepasswd "${VM_WEB_PASSWORD:0:8}" "$RUNNER_TEMP/vmtest/x11vnc.pass" >/dev/null
+            x11vnc -display :99 -rfbauth "$RUNNER_TEMP/vmtest/x11vnc.pass" -forever -shared -rfbport 5900 -localhost > "$RUNNER_TEMP/vmtest/x11vnc.log" 2>&1 &
+            VNC_PID=$!
+            websockify --web=/usr/share/novnc/ 6080 localhost:5900 > "$RUNNER_TEMP/vmtest/websockify.log" 2>&1 &
+            WEB_PID=$!
+            TARGET_PORT=6080
+            echo "XFCE desktop started. The noVNC browser client will request the VNC password."
+            echo "Desktop VNC password is the first 8 characters of VM_WEB_PASSWORD."
+          else
+            TTYD_PORT="$(python3 - <<'PY'
+          import socket
+          s = socket.socket()
+          s.bind(("127.0.0.1", 0))
+          print(s.getsockname()[1])
+          s.close()
+          PY
+          )"
+            VM_UI_PORT="$(python3 - <<'PY'
+          import socket
+          s = socket.socket()
+          s.bind(("127.0.0.1", 0))
+          print(s.getsockname()[1])
+          s.close()
+          PY
+          )"
+            export NODE_PATH="$RUNNER_TEMP/vmtest/proxy/node_modules"
+            ttyd --interface 127.0.0.1 --port "$TTYD_PORT" --client-option fontSize=16 \
+              --credential "cctvtest:${VM_WEB_PASSWORD}" --writable \
+              bash --noprofile --rcfile "$RUNNER_TEMP/vmtest/session-shell.rc" -i \
+              > "$RUNNER_TEMP/vmtest/ttyd.log" 2>&1 &
+            TTYD_PID=$!
+            TTYD_PORT="$TTYD_PORT" VM_UI_PORT="$VM_UI_PORT" node "$GITHUB_WORKSPACE/.github/scripts/vm-ui-proxy.cjs" \
+              > "$RUNNER_TEMP/vmtest/vm-ui-proxy.log" 2>&1 &
+            UI_PROXY_PID=$!
+            TARGET_PORT="$VM_UI_PORT"
+            UI_READY=0
+            for ui_attempt in $(seq 1 20); do
+              if curl --fail --silent --user "cctvtest:${VM_WEB_PASSWORD}" "http://127.0.0.1:${VM_UI_PORT}/" -o "$RUNNER_TEMP/vmtest/ui-check.html" 2>/dev/null \
+                && grep -q "VM CONSOLE" "$RUNNER_TEMP/vmtest/ui-check.html" \
+                && grep -q "data-chord" "$RUNNER_TEMP/vmtest/ui-check.html"; then
+                UI_READY=1
+                break
+              fi
+              sleep 1
+            done
+            if [[ "$UI_READY" -ne 1 ]]; then
+              echo "::error::Modern terminal UI failed its local smoke test."
+              cat "$RUNNER_TEMP/vmtest/vm-ui-proxy.log" || true
+              cat "$RUNNER_TEMP/vmtest/ttyd.log" || true
+              exit 1
+            fi
+            echo "Modern terminal UI smoke test passed."
+          fi
 
           cleanup() {
-            if [[ -n "${TUNNEL_PID:-}" ]]; then
-              kill "$TUNNEL_PID" 2>/dev/null || true
-              wait "$TUNNEL_PID" 2>/dev/null || true
-            fi
-            if [[ -n "${UI_PROXY_PID:-}" ]]; then
-              kill "$UI_PROXY_PID" 2>/dev/null || true
-              wait "$UI_PROXY_PID" 2>/dev/null || true
-            fi
-            if [[ -n "${TTYD_PID:-}" ]]; then
-              kill "$TTYD_PID" 2>/dev/null || true
-              wait "$TTYD_PID" 2>/dev/null || true
-            fi
+            for pid in "${TUNNEL_PID:-}" "${WEB_PID:-}" "${VNC_PID:-}" "${XTERM_PID:-}" "${XFCE_PID:-}" "${DISPLAY_PID:-}" "${UI_PROXY_PID:-}" "${TTYD_PID:-}"; do
+              if [[ -n "$pid" ]]; then kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; fi
+            done
           }
           TUNNEL_PID=""
           trap cleanup EXIT
-
-          # Verify the injected UI is actually served before publishing the tunnel URL.
-          UI_READY=0
-          for ui_attempt in $(seq 1 20); do
-            if curl --fail --silent --show-error --user "cctvtest:${VM_WEB_PASSWORD}" \
-              "http://127.0.0.1:${VM_UI_PORT}/" -o "$RUNNER_TEMP/vmtest/ui-check.html" 2>/dev/null \
-              && grep -q "VM CONSOLE" "$RUNNER_TEMP/vmtest/ui-check.html" \
-              && grep -q "data-chord" "$RUNNER_TEMP/vmtest/ui-check.html"; then
-              UI_READY=1
-              break
-            fi
-            sleep 1
-          done
-          if [[ "$UI_READY" -ne 1 ]]; then
-            echo "::error::Modern terminal UI failed its local smoke test."
-            cat "$RUNNER_TEMP/vmtest/vm-ui-proxy.log" || true
-            cat "$RUNNER_TEMP/vmtest/ttyd.log" || true
-            exit 1
-          fi
-          echo "Modern terminal UI smoke test passed."
 
           URL=""
           for tunnel_attempt in $(seq 1 5); do
             echo "Starting Cloudflare Quick Tunnel (attempt ${tunnel_attempt}/5)..."
             : > "$RUNNER_TEMP/vmtest/cloudflared.log"
-            "$CLOUDFLARED" tunnel --url "http://127.0.0.1:${VM_UI_PORT}" --no-autoupdate > "$RUNNER_TEMP/vmtest/cloudflared.log" 2>&1 &
+            "$CLOUDFLARED" tunnel --url "http://127.0.0.1:${TARGET_PORT}" --no-autoupdate > "$RUNNER_TEMP/vmtest/cloudflared.log" 2>&1 &
             TUNNEL_PID=$!
-
             for wait_attempt in $(seq 1 25); do
-              if ! kill -0 "$TTYD_PID" 2>/dev/null; then
-                echo "::error::The browser terminal stopped unexpectedly."
-                cat "$RUNNER_TEMP/vmtest/ttyd.log"
-                exit 1
+              if [[ "$SESSION_MODE" == "desktop" ]]; then
+                kill -0 "$VNC_PID" 2>/dev/null || { echo "::error::XFCE/VNC stopped unexpectedly."; cat "$RUNNER_TEMP/vmtest/x11vnc.log"; exit 1; }
+              else
+                kill -0 "$TTYD_PID" 2>/dev/null || { echo "::error::The browser terminal stopped unexpectedly."; cat "$RUNNER_TEMP/vmtest/ttyd.log"; exit 1; }
               fi
-
               URL="$(grep -Eo 'https://[^[:space:]]+trycloudflare\.com' "$RUNNER_TEMP/vmtest/cloudflared.log" | head -n 1 || true)"
-              if [[ -n "$URL" ]]; then
-                break
-              fi
-
-              if ! kill -0 "$TUNNEL_PID" 2>/dev/null; then
-                break
-              fi
+              [[ -n "$URL" ]] && break
+              kill -0 "$TUNNEL_PID" 2>/dev/null || break
               sleep 1
             done
-
-            if [[ -n "$URL" ]]; then
-              break
-            fi
-
+            [[ -n "$URL" ]] && break
             echo "Quick Tunnel attempt ${tunnel_attempt} did not produce a URL."
             cat "$RUNNER_TEMP/vmtest/cloudflared.log"
             kill "$TUNNEL_PID" 2>/dev/null || true
             wait "$TUNNEL_PID" 2>/dev/null || true
             TUNNEL_PID=""
-
-            if [[ "$tunnel_attempt" -lt 5 ]]; then
-              delay=$((tunnel_attempt * 4))
-              echo "Retrying Cloudflare Quick Tunnel in ${delay}s..."
-              sleep "$delay"
-            fi
+            if [[ "$tunnel_attempt" -lt 5 ]]; then delay=$((tunnel_attempt * 4)); echo "Retrying in ${delay}s..."; sleep "$delay"; fi
           done
 
           if [[ -z "$URL" ]]; then
             echo "::error::Could not obtain a temporary tunnel URL after 5 attempts."
-            echo "Final Cloudflared output:"
             cat "$RUNNER_TEMP/vmtest/cloudflared.log"
             exit 1
           fi
 
           echo "=================================================="
-          echo "TEMPORARY BROWSER VM WITH MODERN TOUCH UI IS READY"
-          echo "Open this URL and sign in with:"
-          echo "  Username: cctvtest"
-          echo "  Password: the value you saved as VM_WEB_PASSWORD"
+          if [[ "$SESSION_MODE" == "desktop" ]]; then
+            echo "TEMPORARY UBUNTU XFCE DESKTOP IS READY"
+            echo "Open this URL. Enter the first 8 characters of VM_WEB_PASSWORD in the VNC password prompt."
+            echo "XFCE starts with a terminal open; use extend <minutes> (1-300)."
+          else
+            echo "TEMPORARY UBUNTU BROWSER TERMINAL IS READY"
+            echo "Username: cctvtest"
+            echo "Password: the value saved as VM_WEB_PASSWORD"
+            echo "Use extend <minutes> (1-300) to add time."
+          fi
           echo "$URL"
-          echo "The session starts with 2 minutes. Use extend <minutes> (1-300) in the terminal to add time."
-          echo "Do not share the URL or password."
+          echo "Initial active session time: 2 minutes. Do not share the URL or password."
           echo "=================================================="
 
-          # Workflow-owned countdown starts at 120 seconds. The extend command writes
-          # requests to the FIFO; this loop validates and applies them to the timer.
           remaining=120
           while (( remaining > 0 )); do
             if [[ -f "$VM_SHUTDOWN_MARKER" ]]; then
-              echo "::warning::Linux was shut down by the user; closing the temporary browser VM workflow normally."
-              echo "The Linux session is closed. This GitHub Actions workspace will now close too."
+              echo "::warning::Ubuntu shutdown was requested intentionally; closing the temporary workspace normally."
+              echo "Ubuntu session closed. GitHub Actions job will now finish successfully."
               exit 0
             fi
-            if ! kill -0 "$TTYD_PID" 2>/dev/null; then
-              echo "The browser terminal has stopped. Ending session."
-              break
+            if [[ "$SESSION_MODE" == "desktop" ]]; then
+              if ! kill -0 "$VNC_PID" 2>/dev/null; then echo "Desktop server stopped. Ending session normally."; break; fi
+            else
+              if ! kill -0 "$TTYD_PID" 2>/dev/null; then echo "Browser terminal stopped. Ending session normally."; break; fi
             fi
+
+            if (( remaining == 30 )); then
+              WARNING_MESSAGE="WARNING: only 30 seconds remain in your Ubuntu session. To keep it running, type: extend 10 (or another number of minutes, 1-300)."
+              echo "::warning::${WARNING_MESSAGE}"
+              wall "$WARNING_MESSAGE" 2>/dev/null || true
+              printf '\n\033[1;33m%s\033[0m\n\n' "$WARNING_MESSAGE" || true
+            fi
+
             if IFS= read -r -t 1 -u 9 request; then
               if [[ "$request" =~ ^[0-9]+$ ]] && (( ${#request} <= 3 )) && (( 10#$request >= 1 && 10#$request <= 300 )); then
                 remaining=$((remaining + 10#$request * 60))
@@ -255,4 +283,4 @@ jobs:
               remaining=$((remaining - 1))
             fi
           done
-          echo "Session time expired or terminal stopped. Closing the temporary browser VM now."
+          echo "Session time expired or session stopped. Closing the temporary Ubuntu workspace."
