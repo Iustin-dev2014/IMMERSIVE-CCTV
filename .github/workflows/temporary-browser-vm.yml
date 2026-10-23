@@ -178,7 +178,10 @@ jobs:
           if [[ "${SESSION_MODE}" == "desktop" ]]; then
             sudo DEBIAN_FRONTEND=noninteractive apt-get install -y xvfb xfce4 xfce4-terminal dbus-x11 x11vnc novnc websockify xterm x11-utils
           else
-            sudo apt-get install -y ttyd
+            # The self-hosted Ubuntu runner does not guarantee Node.js/npm are preinstalled.
+            sudo apt-get install -y ttyd nodejs npm
+            node --version
+            npm --version
             npm install --prefix "$RUNNER_TEMP/vmtest/proxy" --no-save http-proxy@1.18.1
           fi
           mkdir -p "$RUNNER_TEMP/vmtest"
