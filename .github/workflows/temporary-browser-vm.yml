@@ -359,7 +359,7 @@ jobs:
           git commit -m "Consume successfully imported Ubuntu session snapshot"
           git push origin "HEAD:${GITHUB_REF_NAME}"
 
-      - name: Create Ubuntu session snapshot ZIP
+      - name: Create Ubuntu session snapshot chunk directory
         id: save_snapshot
         if: always() && steps.session.outcome == 'success' && steps.session.outputs.no_save != 'true'
         shell: bash
@@ -374,6 +374,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ubuntu-session-save-${{ github.run_id }}
-          path: ubuntu-session-save.zip
+          path: ubuntu-session-save/
           if-no-files-found: error
           retention-days: 30
