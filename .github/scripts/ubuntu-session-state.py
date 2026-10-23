@@ -17,9 +17,16 @@ HOME = Path.home()
 MAX_UNPACKED = 5 * 1024 * 1024 * 1024
 EXCLUDED_PARTS = {
     ".ssh", ".gnupg", ".aws", ".azure", ".kube", ".docker",
-    ".local/share/keyrings", ".config/gh", ".cache", ".npm",
-    ".cargo/registry", ".rustup", ".gradle/caches", ".mozilla",
-    ".config/google-chrome", ".config/chromium",
+    ".local/share/keyrings", ".local/share/Trash", ".config/gh",
+    ".cache", ".npm", ".cargo/registry", ".rustup", ".gradle/caches",
+    ".mozilla", ".config/google-chrome", ".config/chromium",
+    ".thumbnails", ".pytest_cache", ".mypy_cache", ".ruff_cache",
+    ".tox", "__pycache__", "node_modules", ".venv", "venv",
+    ".next", ".turbo",
+}
+EXCLUDED_PREFIXES = {
+    ".config/Code/Cache", ".config/Code/CachedData",
+    ".config/Code/Service Worker/CacheStorage",
 }
 PACKAGE_RE = re.compile(r"^[a-z0-9][a-z0-9+.-]*$")
 
@@ -28,8 +35,12 @@ def safe_member(name):
     return not p.is_absolute() and ".." not in p.parts and bool(p.parts)
 
 def excluded(rel):
+    parts = rel.parts
     value = rel.as_posix()
-    return any(value == item or value.startswith(item + "/") for item in EXCLUDED_PARTS)
+    # Exclude regenerable cache/dependency directories anywhere in HOME.
+    if any(part in EXCLUDED_PARTS for part in parts):
+        return True
+    return any(value == item or value.startswith(item + "/") for item in EXCLUDED_PREFIXES)
 
 def sha256_bytes(data):
     return hashlib.sha256(data).hexdigest()
@@ -85,8 +96,19 @@ def save():
         zf.writestr("SHA256SUMS.txt", "".join(
             f"{item['sha256']}  {name}\n" for name, item in sorted(entries.items())
         ))
-    print(f"Snapshot created: {out} ({out.stat().st_size} bytes; {len(entries)} files)")
-    print("Sensitive credential folders and caches are intentionally excluded.")
+    size_bytes = out.stat().st_size
+    print(f"Snapshot created: {out} ({size_bytes:,} bytes; {len(entries)} files)")
+    print(f"Snapshot size: {size_bytes / (1024 ** 2):.1f} MiB ({size_bytes / (1000 ** 2):.1f} MB)")
+    largest = sorted(
+        ((meta["size"], name) for name, meta in entries.items() if name.startswith("home/")),
+        reverse=True
+    )[:20]
+    if largest:
+        print("Largest included files (uncompressed sizes):")
+        for size, name in largest:
+            print(f"  {size / (1024 ** 2):8.1f} MiB  {name}")
+    print("Excluded regenerable caches, dependency folders, temporary Python environments, and Trash.")
+    print("User project source files, documents, and ordinary settings remain included.")
 
 def restore():
     if not SAVE_DIR.is_dir():
