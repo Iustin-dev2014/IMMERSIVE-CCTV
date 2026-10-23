@@ -13,6 +13,7 @@ on:
           - desktop
 
 permissions:
+  actions: read
   contents: write
 
 concurrency:
@@ -42,6 +43,52 @@ jobs:
             exit 1
           fi
 
+
+      - name: Find previous Ubuntu snapshot artifact (no 25 MB repository upload needed)
+        id: find_snapshot
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          CURRENT_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          mkdir -p "ubuntu saves"
+          # A manually supplied snapshot in the repository takes priority.
+          if [[ -d "ubuntu saves/ubuntu-session-save" ]] || compgen -G "ubuntu saves/*.zip" >/dev/null; then
+            echo "source=repository" >> "$GITHUB_OUTPUT"
+            echo "A snapshot is already present in 'ubuntu saves'; keeping it as the restore source."
+            exit 0
+          fi
+
+          # Artifacts can hold a large snapshot without committing hundreds of MB/GB into Git history.
+          # Each payload fragment remains 4 MiB, comfortably below the 25 MB web-upload limit.
+          mapfile -t RUN_IDS < <(gh run list --workflow temporary-browser-vm.yml --limit 50 \
+            --json databaseId,status,conclusion \
+            --jq ".[] | select((.databaseId | tostring) != \"$CURRENT_RUN_ID\" and .status == \"completed\" and .conclusion == \"success\") | .databaseId")
+
+          for run_id in "${RUN_IDS[@]}"; do
+            artifact_name="ubuntu-session-save-${run_id}"
+            artifact_id="$(gh api "repos/${GH_REPO}/actions/runs/${run_id}/artifacts?per_page=100" \
+              --jq ".artifacts[]? | select(.name == \"$artifact_name\" and .expired == false) | .id" | head -n 1 || true)"
+            [[ -n "$artifact_id" ]] || continue
+            mkdir -p "ubuntu saves/ubuntu-session-save"
+            echo "Found previous snapshot artifact: ${artifact_name} (run ${run_id})."
+            if gh run download "${run_id}" --name "${artifact_name}" --dir "ubuntu saves/ubuntu-session-save"; then
+              if [[ -f "ubuntu saves/ubuntu-session-save/manifest.db" && -d "ubuntu saves/ubuntu-session-save/payload" ]]; then
+                echo "source=artifact" >> "$GITHUB_OUTPUT"
+                echo "snapshot_name=ubuntu-session-save" >> "$GITHUB_OUTPUT"
+                echo "Downloaded the prior snapshot artifact for validation and restore."
+                exit 0
+              fi
+              echo "Downloaded artifact did not contain the expected chunk folder; trying an older snapshot."
+              rm -rf "ubuntu saves/ubuntu-session-save"
+              mkdir -p "ubuntu saves/ubuntu-session-save"
+            fi
+          done
+          rmdir "ubuntu saves/ubuntu-session-save" 2>/dev/null || true
+          echo "source=none" >> "$GITHUB_OUTPUT"
+          echo "No prior snapshot artifact found; starting with a clean home directory."
 
       - name: Validate and restore saved Ubuntu session (if present)
         id: restore
@@ -341,7 +388,7 @@ jobs:
           fi
           echo "Session time expired or session stopped. Closing the temporary Ubuntu workspace."
 
-      - name: Remove consumed snapshot from repository after successful import
+      - name: Remove consumed snapshot only after successful import
         if: steps.restore.outputs.restored == 'true'
         shell: bash
         env:
@@ -349,15 +396,22 @@ jobs:
         run: |
           set -euo pipefail
           SNAPSHOT_PATH="ubuntu saves/${SNAPSHOT_NAME}"
-          if [[ ! -f "${SNAPSHOT_PATH}" ]]; then
-            echo "::error::Imported snapshot disappeared from the checkout; refusing to create a deletion commit."
+          if [[ ! -e "${SNAPSHOT_PATH}" ]]; then
+            echo "::error::Imported snapshot disappeared before cleanup; refusing to claim it was removed."
             exit 1
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm -r -- "${SNAPSHOT_PATH}"
-          git commit -m "Consume successfully imported Ubuntu session snapshot"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          # Artifact snapshots are temporary runner files, not repository content.
+          # Only commit a deletion if the user supplied a tracked snapshot in Git.
+          if git ls-files --error-unmatch -- "${SNAPSHOT_PATH}" >/dev/null 2>&1; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git rm -r -- "${SNAPSHOT_PATH}"
+            git commit -m "Consume successfully imported Ubuntu session snapshot"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          else
+            rm -rf -- "${SNAPSHOT_PATH}"
+            echo "Successfully imported artifact snapshot; removed only the local extracted copy. The original artifact remains available until its retention expires."
+          fi
 
       - name: Create Ubuntu session snapshot chunk directory
         id: save_snapshot
