@@ -110,12 +110,20 @@ jobs:
           }
           nosave() {
             if [[ "$#" -eq 1 && "${1:-}" == "-yes" ]]; then
-              printf '\n[NO-SAVE] Explicitly requested. This session will close without creating or uploading a new snapshot.\n'
               touch "$VM_NO_SAVE_MARKER"
-              touch "$VM_SHUTDOWN_MARKER"
-              exit 0
+              printf '\n[NO-SAVE MODE] Enabled. The session stays open. When it eventually closes, no new snapshot ZIP will be created or uploaded. Type save -yes to cancel this and save normally.\n'
+              return 0
             fi
-            echo "Usage: nosave -yes  (close this session without creating a new snapshot)"
+            echo "Usage: nosave -yes  (keep this session open, but do not save a snapshot when it closes)"
+            return 2
+          }
+          save() {
+            if [[ "$#" -eq 1 && "${1:-}" == "-yes" ]]; then
+              rm -f "$VM_NO_SAVE_MARKER"
+              printf '\n[SAVE MODE] Enabled. When this session closes normally, a snapshot ZIP will be created and uploaded.\n'
+              return 0
+            fi
+            echo "Usage: save -yes  (cancel no-save mode and save a snapshot when the session closes)"
             return 2
           }
           poweroff() { shutdown "$@"; }
@@ -281,15 +289,15 @@ jobs:
 
           remaining=120
           while (( remaining > 0 )); do
-            if [[ -f "$VM_NO_SAVE_MARKER" ]]; then
-              echo "no_save=true" >> "$GITHUB_OUTPUT"
-              echo "::notice::nosave -yes was received. The session will close without creating or uploading a new snapshot."
-              echo "Ubuntu session closed without saving."
-              exit 0
-            fi
             if [[ -f "$VM_SHUTDOWN_MARKER" ]]; then
-              echo "::warning::Ubuntu shutdown was requested intentionally; closing the temporary workspace normally."
-              echo "Ubuntu session closed. GitHub Actions job will now finish successfully."
+              if [[ -f "$VM_NO_SAVE_MARKER" ]]; then
+                echo "no_save=true" >> "$GITHUB_OUTPUT"
+                echo "::notice::No-save mode was enabled. Closing the session without creating or uploading a new snapshot."
+                echo "Ubuntu session closed without saving."
+              else
+                echo "::warning::Ubuntu shutdown was requested intentionally; closing the temporary workspace normally."
+                echo "Ubuntu session closed. A snapshot will be created after the session closes."
+              fi
               exit 0
             fi
             if [[ "$SESSION_MODE" == "desktop" ]]; then
@@ -327,6 +335,10 @@ jobs:
               remaining=$((remaining - 1))
             fi
           done
+          if [[ -f "$VM_NO_SAVE_MARKER" ]]; then
+            echo "no_save=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::No-save mode was enabled. Session ended without creating or uploading a new snapshot."
+          fi
           echo "Session time expired or session stopped. Closing the temporary Ubuntu workspace."
 
       - name: Remove consumed snapshot from repository after successful import
