@@ -71,6 +71,7 @@ def save():
         manifest = {
             "format": "immersive-cctv-ubuntu-session",
             "version": VERSION,
+            "session_mode": os.environ.get("SESSION_MODE", "unknown"),
             "created_utc": subprocess.run(
                 ["date", "-u", "+%Y-%m-%dT%H:%M:%SZ"],
                 text=True, stdout=subprocess.PIPE, check=True
@@ -116,6 +117,23 @@ def restore():
             raise ValueError(f"Invalid manifest JSON ({exc}); snapshot retained.")
         if manifest.get("format") != "immersive-cctv-ubuntu-session" or manifest.get("version") != VERSION:
             raise ValueError("Unsupported snapshot format/version; snapshot retained.")
+        snapshot_mode = manifest.get("session_mode")
+        requested_mode = os.environ.get("SESSION_MODE", "unknown")
+        if snapshot_mode not in {"terminal", "desktop"}:
+            raise ValueError(
+                "Snapshot does not declare a recognized session_mode (terminal/desktop). "
+                "It may be from an older format; ZIP retained. Select the matching mode only "
+                "after creating a snapshot with the updated workflow."
+            )
+        if requested_mode not in {"terminal", "desktop"}:
+            raise ValueError(f"Invalid requested SESSION_MODE {requested_mode!r}; snapshot retained.")
+        if snapshot_mode != requested_mode:
+            raise ValueError(
+                f"Session mode mismatch: this ZIP was saved from '{snapshot_mode}', but this run "
+                f"selected '{requested_mode}'. Choose '{snapshot_mode}' to restore it, or move "
+                "the ZIP out of 'ubuntu saves' if you intentionally want a clean session. "
+                "The ZIP has NOT been imported or deleted."
+            )
         files = manifest.get("files")
         if not isinstance(files, dict) or manifest.get("file_count") != len(files):
             raise ValueError("Manifest file list/count mismatch; snapshot retained.")
