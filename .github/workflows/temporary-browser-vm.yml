@@ -80,7 +80,7 @@ jobs:
           # Enumerate completed workflow runs and print every still-available Ubuntu snapshot artifact.
           mapfile -t RUN_IDS < <(gh run list --workflow temporary-browser-vm.yml --limit 1000 \
             --json databaseId,status,conclusion,createdAt \
-            --jq ".[] | select((.databaseId | tostring) != \"${CURRENT_RUN_ID}\" and .status == \"completed\" and .conclusion == \"success\") | .databaseId")
+            --jq ".[] | select((.databaseId | tostring) != \"${CURRENT_RUN_ID}\" and .status == \"completed\") | .databaseId")
           declare -a AVAILABLE_RUN_IDS=()
           echo "Available Ubuntu snapshot artifacts (newest first):"
           for run_id in "${RUN_IDS[@]}"; do
