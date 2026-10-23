@@ -50,7 +50,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           if [[ "${SESSION_MODE}" == "desktop" ]]; then
-            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y xvfb xfce4 xfce4-terminal dbus-x11 x11vnc novnc websockify xterm
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y xvfb xfce4 xfce4-terminal dbus-x11 x11vnc novnc websockify xterm x11-utils
           else
             sudo apt-get install -y ttyd
             npm install --prefix "$RUNNER_TEMP/vmtest/proxy" --no-save http-proxy@1.18.1
@@ -273,7 +273,18 @@ jobs:
             if (( remaining == 30 )); then
               WARNING_MESSAGE="WARNING: only 30 seconds remain in your Ubuntu session. To keep it running, type: extend 10 (or another number of minutes, 1-300)."
               echo "::warning::${WARNING_MESSAGE}"
+              # Broadcast inside the actual Ubuntu session, not just to the Actions log.
+              # wall uses logged-in sessions; writing to session PTYs also covers browser
+              # terminals that do not register themselves in utmp/who.
               wall "$WARNING_MESSAGE" 2>/dev/null || true
+              for tty_path in /dev/pts/[0-9]*; do
+                [[ -w "$tty_path" ]] || continue
+                printf '\r\n\033[1;33m[BROADCAST] %s\033[0m\r\n' "$WARNING_MESSAGE" > "$tty_path" 2>/dev/null || true
+              done
+              # In desktop mode, also show a real on-screen Ubuntu/XFCE popup.
+              if [[ "$SESSION_MODE" == "desktop" ]] && command -v xmessage >/dev/null 2>&1; then
+                DISPLAY=:99 xmessage -center -timeout 25 -title "Ubuntu session warning" "$WARNING_MESSAGE" >/dev/null 2>&1 &
+              fi
               printf '\n\033[1;33m%s\033[0m\n\n' "$WARNING_MESSAGE" || true
             fi
 
