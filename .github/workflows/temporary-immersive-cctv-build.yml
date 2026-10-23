@@ -37,7 +37,7 @@ jobs:
           java-version: "17"
 
       - name: Confirm Windows runner and Java
-        shell: pwsh
+        shell: powershell
         run: |
           $ErrorActionPreference = "Stop"
           if ($env:RUNNER_OS -ne "Windows") {
@@ -53,7 +53,7 @@ jobs:
 
       - name: Install a temporary Gradle distribution if needed
         id: gradle
-        shell: pwsh
+        shell: powershell
         run: |
           $ErrorActionPreference = "Stop"
           $gradleVersion = "8.8"
@@ -84,7 +84,7 @@ jobs:
           & $gradleBat --version
 
       - name: Build mod JAR
-        shell: pwsh
+        shell: powershell
         env:
           BUILD_MODE: ${{ inputs.build_mode }}
         run: |
@@ -105,7 +105,7 @@ jobs:
 
       - name: Verify output JAR and print build summary
         id: verify
-        shell: pwsh
+        shell: powershell
         run: |
           $ErrorActionPreference = "Stop"
           $jars = @(Get-ChildItem -Path "build\libs" -Filter "*.jar" -File -ErrorAction SilentlyContinue |
@@ -131,7 +131,7 @@ jobs:
 
       - name: Report result
         if: always()
-        shell: pwsh
+        shell: powershell
         env:
           BUILD_OUTCOME: ${{ job.status }}
           JAR_NAMES: ${{ steps.verify.outputs.jar_names }}
