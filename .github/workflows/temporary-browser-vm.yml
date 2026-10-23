@@ -1,4 +1,4 @@
-name: Temporary Browser VM (2 minutes + extend command)
+name: Temporary Browser VM (2 minutes + touch controls + extend)
 
 on:
   workflow_dispatch:
@@ -16,6 +16,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     steps:
+      - name: Check out VM UI assets
+        uses: actions/checkout@v4
+
       - name: Check required password secret
         shell: bash
         env:
@@ -32,8 +35,8 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y ttyd
-
           mkdir -p "$RUNNER_TEMP/vmtest"
+          npm install --prefix "$RUNNER_TEMP/vmtest/proxy" --no-save http-proxy@1.18.1
           curl --fail --silent --show-error --location \
             "https://github.com/cloudflare/cloudflared/releases/download/2026.10.1/cloudflared-linux-amd64" \
             -o "$RUNNER_TEMP/vmtest/cloudflared"
@@ -52,6 +55,7 @@ jobs:
 
           TTYD_BIN="$(command -v ttyd)"
           CLOUDFLARED="$RUNNER_TEMP/vmtest/cloudflared"
+          export NODE_PATH="$RUNNER_TEMP/vmtest/proxy/node_modules"
 
           # Pick a free local port instead of assuming 7681 is always available.
           TTYD_PORT="$(python3 - <<'PY'
@@ -63,16 +67,25 @@ jobs:
           PY
           )"
 
-          echo "Using local ttyd port: ${TTYD_PORT}"
+          VM_UI_PORT="$(python3 - <<'PY'
+          import socket
+          s = socket.socket()
+          s.bind(("127.0.0.1", 0))
+          print(s.getsockname()[1])
+          s.close()
+          PY
+          )"
 
-          # The terminal command writes extension requests to a FIFO; the workflow timer
-          # below consumes them and extends its own countdown.
+          echo "Using local ttyd port: ${TTYD_PORT}"
+          echo "Using modern UI proxy port: ${VM_UI_PORT}"
+
+          # Treat an intentional Linux shutdown as a normal end to this temporary workspace.
+          export VM_SHUTDOWN_MARKER="$RUNNER_TEMP/vmtest/shutdown-requested"
           EXTEND_FIFO="$RUNNER_TEMP/vmtest/extend.fifo"
-          BASHRC="$RUNNER_TEMP/vmtest/terminal.bashrc"
           mkfifo "$EXTEND_FIFO"
           export VM_EXTEND_FIFO="$EXTEND_FIFO"
-
-          cat > "$BASHRC" <<'BASHRC'
+          cat > "$RUNNER_TEMP/vmtest/vm-shell.rc" <<'SHELL_RC'
+          export PS1='[user]@immersive-cctv! '
           extend() {
             if [[ "${1:-}" == "" || ! "${1:-}" =~ ^[0-9]+$ ]]; then
               echo "Usage: extend <minutes> (1-300)"
@@ -85,24 +98,51 @@ jobs:
             printf '%s\n' "${1}" > "$VM_EXTEND_FIFO"
             echo "Extension request sent to workflow: +${1} minute(s)."
           }
-          echo "Temporary Ubuntu terminal. Initial session: 2 minutes."
-          echo "To extend the workflow timer, type: extend <minutes> (1-300)"
-          BASHRC
-
-          # Open the FIFO read/write so the workflow can poll it without blocking.
+          echo "Initial session: 2 minutes. Use: extend <minutes> (1-300)"
+          shutdown() {
+            printf '\n[WARNING] Linux session is shutting down. GitHub Actions will close this temporary workspace.\n'
+            touch "${VM_SHUTDOWN_MARKER}"
+            exit 0
+          }
+          poweroff() { shutdown "$@"; }
+          halt() { shutdown "$@"; }
+          reboot() {
+            printf '\n[WARNING] Reboot requested. Closing this temporary Linux workspace instead.\n'
+            touch "${VM_SHUTDOWN_MARKER}"
+            exit 0
+          }
+          sudo() {
+            local arg
+            for arg in "$@"; do
+              case "${arg##*/}" in
+                shutdown|poweroff|halt|reboot) shutdown "$@"; return $? ;;
+              esac
+            done
+            command sudo "$@"
+          }
+          SHELL_RC
           exec 9<> "$EXTEND_FIFO"
 
-          # Start a clean interactive shell with the extend command available.
+          # Keep ttyd as the terminal engine; the proxy adds the touch-first interface.
           "$TTYD_BIN" --interface 127.0.0.1 --port "$TTYD_PORT" \
+            --client-option fontSize=16 \
             --credential "cctvtest:${VM_WEB_PASSWORD}" --writable \
-            bash --noprofile --norc --rcfile "$BASHRC" -i \
+            bash --noprofile --rcfile "$RUNNER_TEMP/vmtest/vm-shell.rc" -i \
             > "$RUNNER_TEMP/vmtest/ttyd.log" 2>&1 &
           TTYD_PID=$!
+
+          TTYD_PORT="$TTYD_PORT" VM_UI_PORT="$VM_UI_PORT" node "$GITHUB_WORKSPACE/.github/scripts/vm-ui-proxy.cjs" \
+            > "$RUNNER_TEMP/vmtest/vm-ui-proxy.log" 2>&1 &
+          UI_PROXY_PID=$!
 
           cleanup() {
             if [[ -n "${TUNNEL_PID:-}" ]]; then
               kill "$TUNNEL_PID" 2>/dev/null || true
               wait "$TUNNEL_PID" 2>/dev/null || true
+            fi
+            if [[ -n "${UI_PROXY_PID:-}" ]]; then
+              kill "$UI_PROXY_PID" 2>/dev/null || true
+              wait "$UI_PROXY_PID" 2>/dev/null || true
             fi
             if [[ -n "${TTYD_PID:-}" ]]; then
               kill "$TTYD_PID" 2>/dev/null || true
@@ -112,11 +152,31 @@ jobs:
           TUNNEL_PID=""
           trap cleanup EXIT
 
+          # Verify the injected UI is actually served before publishing the tunnel URL.
+          UI_READY=0
+          for ui_attempt in $(seq 1 20); do
+            if curl --fail --silent --show-error --user "cctvtest:${VM_WEB_PASSWORD}" \
+              "http://127.0.0.1:${VM_UI_PORT}/" -o "$RUNNER_TEMP/vmtest/ui-check.html" 2>/dev/null \
+              && grep -q "VM CONSOLE" "$RUNNER_TEMP/vmtest/ui-check.html" \
+              && grep -q "data-chord" "$RUNNER_TEMP/vmtest/ui-check.html"; then
+              UI_READY=1
+              break
+            fi
+            sleep 1
+          done
+          if [[ "$UI_READY" -ne 1 ]]; then
+            echo "::error::Modern terminal UI failed its local smoke test."
+            cat "$RUNNER_TEMP/vmtest/vm-ui-proxy.log" || true
+            cat "$RUNNER_TEMP/vmtest/ttyd.log" || true
+            exit 1
+          fi
+          echo "Modern terminal UI smoke test passed."
+
           URL=""
           for tunnel_attempt in $(seq 1 5); do
             echo "Starting Cloudflare Quick Tunnel (attempt ${tunnel_attempt}/5)..."
             : > "$RUNNER_TEMP/vmtest/cloudflared.log"
-            "$CLOUDFLARED" tunnel --url "http://127.0.0.1:${TTYD_PORT}" --no-autoupdate > "$RUNNER_TEMP/vmtest/cloudflared.log" 2>&1 &
+            "$CLOUDFLARED" tunnel --url "http://127.0.0.1:${VM_UI_PORT}" --no-autoupdate > "$RUNNER_TEMP/vmtest/cloudflared.log" 2>&1 &
             TUNNEL_PID=$!
 
             for wait_attempt in $(seq 1 25); do
@@ -162,32 +222,32 @@ jobs:
           fi
 
           echo "=================================================="
-          echo "TEMPORARY BROWSER VM IS READY"
+          echo "TEMPORARY BROWSER VM WITH MODERN TOUCH UI IS READY"
           echo "Open this URL and sign in with:"
           echo "  Username: cctvtest"
           echo "  Password: the value you saved as VM_WEB_PASSWORD"
           echo "$URL"
-          echo "The session starts with 2 minutes. In the terminal, use: extend <minutes> (1-300)"
-          echo "Every accepted extension is applied by this workflow's timer."
+          echo "The session starts with 2 minutes. Use extend <minutes> (1-300) in the terminal to add time."
           echo "Do not share the URL or password."
           echo "=================================================="
 
+          # Workflow-owned countdown starts at 120 seconds. The extend command writes
+          # requests to the FIFO; this loop validates and applies them to the timer.
           remaining=120
           while (( remaining > 0 )); do
+            if [[ -f "$VM_SHUTDOWN_MARKER" ]]; then
+              echo "::warning::Linux was shut down by the user; closing the temporary browser VM workflow normally."
+              echo "The Linux session is closed. This GitHub Actions workspace will now close too."
+              exit 0
+            fi
             if ! kill -0 "$TTYD_PID" 2>/dev/null; then
               echo "The browser terminal has stopped. Ending session."
               break
             fi
-
             if IFS= read -r -t 1 -u 9 request; then
-              if [[ "$request" =~ ^[0-9]+$ ]] && (( ${#request} <= 3 )); then
-                if (( 10#$request >= 1 && 10#$request <= 300 )); then
-                  added=$((10#$request * 60))
-                  remaining=$((remaining + added))
-                  echo "Timer extended by $request minute(s). New remaining time: $((remaining / 60))m $((remaining % 60))s."
-                else
-                  echo "Ignored extension outside the 1-300 minute range."
-                fi
+              if [[ "$request" =~ ^[0-9]+$ ]] && (( ${#request} <= 3 )) && (( 10#$request >= 1 && 10#$request <= 300 )); then
+                remaining=$((remaining + 10#$request * 60))
+                echo "Timer extended by $request minute(s). Remaining: $((remaining / 60))m $((remaining % 60))s."
               else
                 echo "Ignored invalid extension request."
               fi
@@ -195,5 +255,4 @@ jobs:
               remaining=$((remaining - 1))
             fi
           done
-
           echo "Session time expired or terminal stopped. Closing the temporary browser VM now."
