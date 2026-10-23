@@ -1,4 +1,4 @@
-name: Temporary Browser VM (5 minutes)
+name: Temporary Browser VM (2 minutes + extend command)
 
 on:
   workflow_dispatch:
@@ -14,7 +14,7 @@ jobs:
   browser-vm:
     name: Start temporary browser terminal
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 360
     steps:
       - name: Check required password secret
         shell: bash
@@ -65,10 +65,37 @@ jobs:
 
           echo "Using local ttyd port: ${TTYD_PORT}"
 
-          # Start a clean interactive shell without forcing a minimal environment.
+          # The terminal command writes extension requests to a FIFO; the workflow timer
+          # below consumes them and extends its own countdown.
+          EXTEND_FIFO="$RUNNER_TEMP/vmtest/extend.fifo"
+          BASHRC="$RUNNER_TEMP/vmtest/terminal.bashrc"
+          mkfifo "$EXTEND_FIFO"
+          export VM_EXTEND_FIFO="$EXTEND_FIFO"
+
+          cat > "$BASHRC" <<'BASHRC'
+          extend() {
+            if [[ "${1:-}" == "" || ! "${1:-}" =~ ^[0-9]+$ ]]; then
+              echo "Usage: extend <minutes> (1-300)"
+              return 2
+            fi
+            if (( 10#${1} < 1 || 10#${1} > 300 )); then
+              echo "Minutes must be between 1 and 300."
+              return 2
+            fi
+            printf '%s\n' "${1}" > "$VM_EXTEND_FIFO"
+            echo "Extension request sent to workflow: +${1} minute(s)."
+          }
+          echo "Temporary Ubuntu terminal. Initial session: 2 minutes."
+          echo "To extend the workflow timer, type: extend <minutes> (1-300)"
+          BASHRC
+
+          # Open the FIFO read/write so the workflow can poll it without blocking.
+          exec 9<> "$EXTEND_FIFO"
+
+          # Start a clean interactive shell with the extend command available.
           "$TTYD_BIN" --interface 127.0.0.1 --port "$TTYD_PORT" \
             --credential "cctvtest:${VM_WEB_PASSWORD}" --writable \
-            bash --noprofile --norc -i \
+            bash --noprofile --norc --rcfile "$BASHRC" -i \
             > "$RUNNER_TEMP/vmtest/ttyd.log" 2>&1 &
           TTYD_PID=$!
 
@@ -140,9 +167,29 @@ jobs:
           echo "  Username: cctvtest"
           echo "  Password: the value you saved as VM_WEB_PASSWORD"
           echo "$URL"
-          echo "The session will close automatically after 5 minutes."
+          echo "The session starts with 2 minutes. In the terminal, use: extend <minutes> (1-300)"
+          echo "Every accepted extension is applied by this workflow's timer."
           echo "Do not share the URL or password."
           echo "=================================================="
 
-          sleep 300
-          echo "Five minutes elapsed. Closing the temporary browser VM now."
+          remaining=120
+          while (( remaining > 0 )); do
+            if ! kill -0 "$TTYD_PID" 2>/dev/null; then
+              echo "The browser terminal has stopped. Ending session."
+              break
+            fi
+
+            if IFS= read -r -t 1 -u 9 request; then
+              if [[ "$request" =~ ^[0-9]+$ ]] && (( 10#$request >= 1 && 10#$request <= 300 )); then
+                added=$((10#$request * 60))
+                remaining=$((remaining + added))
+                echo "Timer extended by $request minute(s). New remaining time: $((remaining / 60))m $((remaining % 60))s."
+              else
+                echo "Ignored invalid extension request."
+              fi
+            else
+              remaining=$((remaining - 1))
+            fi
+          done
+
+          echo "Session time expired or terminal stopped. Closing the temporary browser VM now."
