@@ -45,6 +45,20 @@ jobs:
       - name: Check out VM UI assets
         uses: actions/checkout@v4
 
+      - name: Verify WSL2 Ubuntu runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$(uname -s)" != "Linux" ]]; then
+            echo "::error::This workflow must run on the Ubuntu WSL2 runner, not a Windows runner. Configure the runner inside WSL2 and add the label wsl-ubuntu."
+            exit 1
+          fi
+          if [[ ! -r /etc/os-release ]] || ! grep -qi '^ID=ubuntu' /etc/os-release; then
+            echo "::error::The selected Linux runner is not Ubuntu. Configure the GitHub Actions runner inside Ubuntu WSL2."
+            exit 1
+          fi
+          echo "Runner OS verified: $(. /etc/os-release && echo "$PRETTY_NAME")"
+
       - name: Check required password secret
         shell: bash
         env:
