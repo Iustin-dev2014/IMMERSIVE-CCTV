@@ -55,36 +55,41 @@ def save():
     payload_dir = out_dir / "payload"
     payload_dir.mkdir(parents=True, exist_ok=True)
 
-    # This is a format/obfuscation key, not cryptographic protection.
-    # The matching decoder is deliberately kept in this workflow helper.
-    key = b"immersive-cctv-session-v1"
-    magic = b"ICCTV1D"
-    chunk_bytes = 1024 * 1024
+    # Fast format: zlib level 1 runs in optimized native code. Avoid Python-level
+    # per-byte XOR, which was expensive for large snapshots. This is not encryption.
+    magic = b"ICCTV2D"
+    chunk_bytes = 4 * 1024 * 1024
     next_chunk = 0
     entries = {}
 
     def encode_bytes(data):
-        packed = zlib.compress(data, level=6)
-        return bytes(value ^ key[index % len(key)] for index, value in enumerate(packed))
+        return zlib.compress(data, level=1)
 
-    def store_logical_file(logical_name, data):
+    def write_chunk(part, chunk_names):
+        nonlocal next_chunk
+        chunk_name = f"payload/part-{next_chunk:08d}.dat"
+        (out_dir / chunk_name).write_bytes(magic + encode_bytes(part))
+        chunk_names.append(chunk_name)
+        next_chunk += 1
+
+    def store_logical_file(logical_name, source):
         nonlocal next_chunk
         chunk_names = []
-        for offset in range(0, len(data), chunk_bytes):
-            part = data[offset:offset + chunk_bytes]
-            encoded = magic + encode_bytes(part)
-            chunk_name = f"payload/part-{next_chunk:08d}.dat"
-            (out_dir / chunk_name).write_bytes(encoded)
-            chunk_names.append(chunk_name)
-            next_chunk += 1
-        if not data:
-            chunk_name = f"payload/part-{next_chunk:08d}.dat"
-            (out_dir / chunk_name).write_bytes(magic + encode_bytes(b""))
-            chunk_names.append(chunk_name)
-            next_chunk += 1
+        digest = hashlib.sha256()
+        total_size = 0
+        with source.open("rb") as stream:
+            while True:
+                part = stream.read(chunk_bytes)
+                if not part:
+                    break
+                digest.update(part)
+                total_size += len(part)
+                write_chunk(part, chunk_names)
+        if not chunk_names:
+            write_chunk(b"", chunk_names)
         entries[logical_name] = {
-            "sha256": sha256_bytes(data),
-            "size": len(data),
+            "sha256": digest.hexdigest(),
+            "size": total_size,
             "chunks": chunk_names,
         }
 
@@ -107,17 +112,22 @@ def save():
             if excluded(rel) or source.is_symlink() or not source.is_file():
                 continue
             try:
-                store_logical_file("home/" + rel.as_posix(), source.read_bytes())
+                store_logical_file("home/" + rel.as_posix(), source)
             except OSError as exc:
                 print(f"Skipping unreadable file {rel}: {exc}", file=sys.stderr)
 
     package_data = ("\n".join(packages) + "\n").encode()
-    store_logical_file("metadata/apt-manual.txt", package_data)
+    package_temp = ROOT / ".ubuntu-session-apt-manual.tmp"
+    try:
+        package_temp.write_bytes(package_data)
+        store_logical_file("metadata/apt-manual.txt", package_temp)
+    finally:
+        package_temp.unlink(missing_ok=True)
 
     manifest = {
         "format": "immersive-cctv-chunked-session",
         "version": VERSION,
-        "codec": "ICCTV1D + repeating-key XOR + zlib",
+        "codec": "ICCTV2D + zlib level 1 (fast, no XOR)",
         "session_mode": os.environ.get("SESSION_MODE", "unknown"),
         "created_utc": subprocess.run(
             ["date", "-u", "+%Y-%m-%dT%H:%M:%SZ"],
@@ -130,7 +140,7 @@ def save():
         "notes": "Original files are split into small encoded .dat pieces; manifest.db is the decoder index."
     }
     manifest_data = json.dumps(manifest, separators=(",", ":"), sort_keys=True).encode()
-    (out_dir / "manifest.db").write_bytes(b"ICCTVDB1" + encode_bytes(manifest_data))
+    (out_dir / "manifest.db").write_bytes(b"ICCTVDB2" + encode_bytes(manifest_data))
     (out_dir / "format.info").write_text(
         "ICCTV-SESSION-CHUNKS\nformat=ICCTV1D\nversion=1\nindex=manifest.db\npayload=payload/*.dat\n",
         encoding="utf-8"
@@ -170,22 +180,33 @@ def restore():
     verified = {}
     if has_shards:
         snapshot_name = shard_dir.name
-        key = b"immersive-cctv-session-v1"
-        magic = b"ICCTV1D"
-
-        def decode_bytes(data):
-            unpacked = bytes(value ^ key[index % len(key)] for index, value in enumerate(data))
-            return zlib.decompress(unpacked)
-
         raw_index = (shard_dir / "manifest.db").read_bytes()
-        if not raw_index.startswith(b"ICCTVDB1"):
+        if raw_index.startswith(b"ICCTVDB2"):
+            index_header = b"ICCTVDB2"
+            magic = b"ICCTV2D"
+            def decode_bytes(data):
+                return zlib.decompress(data)
+        elif raw_index.startswith(b"ICCTVDB1"):
+            # Backward compatibility for snapshots made by the previous XOR format.
+            index_header = b"ICCTVDB1"
+            magic = b"ICCTV1D"
+            key = b"immersive-cctv-session-v1"
+            def decode_bytes(data):
+                unpacked = bytes(value ^ key[index % len(key)] for index, value in enumerate(data))
+                return zlib.decompress(unpacked)
+        else:
             raise ValueError("Invalid chunked snapshot index header; snapshot retained.")
         try:
-            manifest = json.loads(decode_bytes(raw_index[len(b"ICCTVDB1"):]))
+            manifest = json.loads(decode_bytes(raw_index[len(index_header):]))
         except Exception as exc:
             raise ValueError(f"Invalid encoded snapshot index ({exc}); snapshot retained.")
         if manifest.get("format") != "immersive-cctv-chunked-session" or manifest.get("version") != VERSION:
             raise ValueError("Unsupported chunked snapshot format/version; snapshot retained.")
+        expected_codec = ("ICCTV2D + zlib level 1 (fast, no XOR)"
+                          if index_header == b"ICCTVDB2"
+                          else "ICCTV1D + repeating-key XOR + zlib")
+        if manifest.get("codec") != expected_codec:
+            raise ValueError("Snapshot codec does not match its index header; snapshot retained.")
         snapshot_mode = manifest.get("session_mode")
         requested_mode = os.environ.get("SESSION_MODE", "unknown")
         if snapshot_mode not in {"terminal", "desktop"}:
