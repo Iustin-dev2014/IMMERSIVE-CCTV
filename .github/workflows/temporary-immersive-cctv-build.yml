@@ -44,6 +44,7 @@ jobs:
             throw "This temporary build workflow must run on the existing Windows self-hosted runner."
           }
           Write-Host "Runner OS: $env:RUNNER_OS"
+          Write-Host "Persistent user profile: $env:USERPROFILE"
           java -version
           if (-not (Test-Path "build.gradle")) {
             throw "build.gradle was not found at the repository root."
@@ -51,7 +52,7 @@ jobs:
           Write-Host "Found build.gradle. Project version and Forge dependencies:"
           Select-String -Path "build.gradle" -Pattern "version\s*=|net\.minecraftforge:forge"
 
-      - name: Install a temporary Gradle distribution if needed
+      - name: Install or reuse persistent Gradle distribution
         id: gradle
         shell: powershell
         run: |
@@ -67,18 +68,28 @@ jobs:
             }
           }
 
-          $installRoot = Join-Path $env:RUNNER_TEMP "immersive-cctv-gradle"
-          $zipPath = Join-Path $env:RUNNER_TEMP "gradle-$gradleVersion-bin.zip"
+          # Keep the Gradle distribution outside RUNNER_TEMP so it survives between jobs.
+          $installRoot = Join-Path $env:USERPROFILE "tools\immersive-cctv-gradle"
+          $zipPath = Join-Path $installRoot "gradle-$gradleVersion-bin.zip"
           $gradleHome = Join-Path $installRoot "gradle-$gradleVersion"
-          New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
-          if (-not (Test-Path (Join-Path $gradleHome "bin\gradle.bat"))) {
-            Write-Host "Downloading official Gradle $gradleVersion distribution..."
-            Invoke-WebRequest -Uri "https://services.gradle.org/distributions/gradle-$gradleVersion-bin.zip" -OutFile $zipPath
-            Expand-Archive -Path $zipPath -DestinationPath $installRoot -Force
-          }
           $gradleBat = Join-Path $gradleHome "bin\gradle.bat"
+          New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
+
           if (-not (Test-Path $gradleBat)) {
-            throw "Could not find gradle.bat after extracting the Gradle distribution."
+            if (-not (Test-Path $zipPath)) {
+              Write-Host "Gradle $gradleVersion archive is not cached; downloading it once to $zipPath"
+              Invoke-WebRequest -Uri "https://services.gradle.org/distributions/gradle-$gradleVersion-bin.zip" -OutFile $zipPath
+            } else {
+              Write-Host "Reusing cached Gradle archive: $zipPath"
+            }
+            Write-Host "Extracting Gradle $gradleVersion into persistent storage..."
+            Expand-Archive -Path $zipPath -DestinationPath $installRoot -Force
+          } else {
+            Write-Host "Reusing persistent Gradle installation: $gradleBat"
+          }
+
+          if (-not (Test-Path $gradleBat)) {
+            throw "Could not find gradle.bat after checking persistent Gradle storage."
           }
           "gradle_executable=$gradleBat" >> $env:GITHUB_OUTPUT
           & $gradleBat --version
@@ -89,6 +100,11 @@ jobs:
           BUILD_MODE: ${{ inputs.build_mode }}
         run: |
           $ErrorActionPreference = "Stop"
+          # Explicitly retain Forge/Minecraft and other dependency caches for this Windows account.
+          $env:GRADLE_USER_HOME = Join-Path $env:USERPROFILE ".gradle"
+          New-Item -ItemType Directory -Force -Path $env:GRADLE_USER_HOME | Out-Null
+          Write-Host "Persistent Gradle dependency cache: $env:GRADLE_USER_HOME"
+
           $gradle = "${{ steps.gradle.outputs.gradle_executable }}"
           if ([string]::IsNullOrWhiteSpace($gradle)) { throw "Gradle executable output is empty." }
 
