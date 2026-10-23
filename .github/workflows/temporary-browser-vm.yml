@@ -118,10 +118,6 @@ jobs:
           if [[ "$SESSION_MODE" == "desktop" ]]; then
             echo "Starting XFCE desktop in a virtual X display..."
             sudo install -m 0644 "$RUNNER_TEMP/vmtest/session-shell.rc" /etc/immersive-vm-shell.rc
-            sudo tee /etc/profile.d/immersive-vm-session.sh >/dev/null <<'PROFILE'
-          export VM_SHUTDOWN_MARKER="$RUNNER_TEMP/vmtest/shutdown-requested"
-          export VM_EXTEND_FIFO="$RUNNER_TEMP/vmtest/extend.fifo"
-          PROFILE
             # Ensure every new interactive Bash terminal has the extension/shutdown commands.
             sudo tee /etc/bash.bashrc.d-immersive-vm >/dev/null < "$RUNNER_TEMP/vmtest/session-shell.rc"
             sudo mkdir -p /etc/bash.bashrc.d
@@ -141,8 +137,6 @@ jobs:
             # Open a terminal immediately so the extend command is visible and ready to use.
             DISPLAY=:99 xfce4-terminal --disable-server --command "bash --rcfile /etc/immersive-vm-shell.rc -i" > "$RUNNER_TEMP/vmtest/xfce-terminal.log" 2>&1 &
             XTERM_PID=$!
-            VNC_PASS_FILE="$RUNNER_TEMP/vmtest/vnc.pass"
-            printf '%s' "${VM_WEB_PASSWORD:0:8}" > "$VNC_PASS_FILE"
             x11vnc -storepasswd "${VM_WEB_PASSWORD:0:8}" "$RUNNER_TEMP/vmtest/x11vnc.pass" >/dev/null
             x11vnc -display :99 -rfbauth "$RUNNER_TEMP/vmtest/x11vnc.pass" -forever -shared -rfbport 5900 -localhost > "$RUNNER_TEMP/vmtest/x11vnc.log" 2>&1 &
             VNC_PID=$!
