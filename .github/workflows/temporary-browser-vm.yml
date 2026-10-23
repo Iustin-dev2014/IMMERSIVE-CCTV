@@ -13,7 +13,7 @@ on:
           - desktop
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: temporary-browser-vm
@@ -42,6 +42,14 @@ jobs:
             exit 1
           fi
 
+
+      - name: Validate and restore saved Ubuntu session (if present)
+        id: restore
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/ubuntu-session-state.py restore
+
       - name: Install session and tunnel tools
         shell: bash
         env:
@@ -64,6 +72,7 @@ jobs:
           echo "Selected session mode: ${SESSION_MODE}"
 
       - name: Start protected Ubuntu session and temporary public tunnel
+        id: session
         shell: bash
         env:
           VM_WEB_PASSWORD: ${{ secrets.VM_WEB_PASSWORD }}
@@ -300,3 +309,38 @@ jobs:
             fi
           done
           echo "Session time expired or session stopped. Closing the temporary Ubuntu workspace."
+
+      - name: Remove consumed snapshot from repository after successful import
+        if: steps.restore.outputs.restored == 'true'
+        shell: bash
+        env:
+          SNAPSHOT_NAME: ${{ steps.restore.outputs.snapshot_name }}
+        run: |
+          set -euo pipefail
+          SNAPSHOT_PATH="ubuntu saves/${SNAPSHOT_NAME}"
+          if [[ ! -f "${SNAPSHOT_PATH}" ]]; then
+            echo "::error::Imported snapshot disappeared from the checkout; refusing to create a deletion commit."
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm -- "${SNAPSHOT_PATH}"
+          git commit -m "Consume successfully imported Ubuntu session snapshot"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
+      - name: Create Ubuntu session snapshot ZIP
+        id: save_snapshot
+        if: always() && steps.session.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/ubuntu-session-state.py save
+
+      - name: Upload Ubuntu session snapshot artifact
+        if: always() && steps.save_snapshot.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ubuntu-session-save-${{ github.run_id }}
+          path: ubuntu-session-save.zip
+          if-no-files-found: error
+          retention-days: 30
